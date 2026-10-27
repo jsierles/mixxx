@@ -1,6 +1,8 @@
 #include "vinylcontrol/vinylcontrolxwax.h"
 
 #include <QtDebug>
+#include <algorithm>
+#include <cmath>
 
 #include "audio/types.h"
 #include "control/controlobject.h"
@@ -65,6 +67,13 @@ VinylControlXwax::VinylControlXwax(UserSettingsPointer pConfig, const QString& g
     signalenabled->set(m_pConfig->getValueString(
                                         ConfigKey(VINYL_PREF_KEY, "show_signal_quality"))
                                .toInt());
+
+    m_autoAbsoluteOnNeedleDrop = m_pConfig->getValue<bool>(
+            ConfigKey("[QuietVinyl]", "NeedleDropAbsolute"),
+            m_pConfig->getValueString(ConfigKey("[Config]", "ResizableSkin")) ==
+                    QStringLiteral("QuietVinylBrowser"));
+    m_requireNeedleReposition = m_pConfig->getValue<bool>(
+            ConfigKey("[QuietVinyl]", "NeedleDropRequirePositionChange"), false);
 
     // Get the vinyl type and speed.
     QString strVinylType = m_pConfig->getValueString(
@@ -223,7 +232,9 @@ void VinylControlXwax::analyzeSamples(CSAMPLE* pSamples, size_t nFrames) {
     }
 
     // Convert CSAMPLE samples to shorts, preventing overflow.
+    double browsePeak = 0;
     for (int i = 0; i < static_cast<int>(samplesSize); ++i) {
+        browsePeak = std::max(browsePeak, std::abs(static_cast<double>(pSamples[i])));
         CSAMPLE sample = pSamples[i] * gain * SAMPLE_MAXIMUM;
 
         if (sample > SAMPLE_MAXIMUM) {
@@ -250,16 +261,56 @@ void VinylControlXwax::analyzeSamples(CSAMPLE* pSamples, size_t nFrames) {
     m_bIsEnabled = enabled && checkEnabled(m_bIsEnabled, enabled->toBool());
 
     double dVinylPitch = timecoder_get_pitch(&timecoder);
+    double positionAge = 1;
+    const int decodedPosition = timecoder_get_position(&timecoder, &positionAge);
 
     if(bHaveSignal) {
         // Always analyze the input samples
-        m_iPosition = timecoder_get_position(&timecoder, nullptr);
+        m_iPosition = decodedPosition;
         //Notify the UI if the timecode quality is good
         establishQuality(dVinylPitch);
     }
 
     //are we even playing and enabled at all?
+    m_browsePitch->set(dVinylPitch);
+    // Slow reversals can still yield quadrature speed before a complete
+    // position code has decoded. Permit motion, but never release confirmation,
+    // on that evidence alone. Require signal and recent crossings on both axes.
+    const bool motionSignal = browsePeak > kMinSignal * 0.5 &&
+            timecoder.primary.crossing_ticker * timecoder.dt < 0.15 &&
+            timecoder.secondary.crossing_ticker * timecoder.dt < 0.15;
+    // Readable quadrature motion is independent of the song transport, mixer
+    // volume and browsing capture. No fresh crossings/signal means stopped/up.
+    m_recordMoving->set(m_bIsEnabled && motionSignal && decodedPosition >= 0 &&
+            positionAge <= 0.15 &&
+            std::isfinite(dVinylPitch) && std::abs(dVinylPitch) >= 0.01 ? 1.0 : 0.0);
+    const int browseValidity = bHaveSignal && m_iPosition != -1 ? 2 : motionSignal ? 1 : 0;
+    m_browseValid->set(m_bIsEnabled ? browseValidity : 0);
+    m_browseFrame->set(m_browseFrame->get() + 1.0);
+    const double browseCapture = m_browseCapture->get();
+    const bool stopBrowseForSignalLoss = m_browseSignalLoss.update(
+            nFrames * timecoder.dt, m_bIsEnabled && browseCapture >= 2.0, motionSignal);
+    if (m_bIsEnabled && browseCapture > 0.0) {
+        m_needleDrop.reset();
+        m_needleAbsolutePending = false;
+        // Capture 2 isolates record motion while retaining the current playback
+        // rate and play state while timecode remains readable. A sustained loss
+        // stops the song and never starts it again while capture remains active.
+        // Capture 1 holds transport during track loading.
+        if (browseCapture < 2.0) {
+            togglePlayButton(false);
+            m_pVCRate->set(0.0);
+        } else {
+            if (stopBrowseForSignalLoss) togglePlayButton(false);
+            if (stopBrowseForSignalLoss || !playButton->toBool()) m_pVCRate->set(0.0);
+            scratching->set(0.0);
+        }
+        m_bForceResync = true;
+        return;
+    }
     if (!m_bIsEnabled) {
+        m_needleDrop.reset();
+        m_needleAbsolutePending = false;
         return;
     }
 
@@ -272,6 +323,8 @@ void VinylControlXwax::analyzeSamples(CSAMPLE* pSamples, size_t nFrames) {
     // changed?  It's just an extra division by trackSampleRate.
     double duration_inaccurate = duration->get();
     if (duration_inaccurate != m_dOldDurationInaccurate) {
+        m_needleDrop.reset();
+        m_needleAbsolutePending = false;
         m_bForceResync = true;
         m_dOldDurationInaccurate = duration_inaccurate;
         m_dOldDuration = trackSamples->get() / 2 / trackSampleRate->get();
@@ -283,6 +336,46 @@ void VinylControlXwax::analyzeSamples(CSAMPLE* pSamples, size_t nFrames) {
                 m_iVCMode = MIXXX_VCMODE_RELATIVE;
             } else {
                 m_iVCMode = m_iOldVCMode;
+            }
+        }
+    }
+
+    const bool needleEligible = m_autoAbsoluteOnNeedleDrop && !m_bCDControl &&
+            trackSamples->get() > 0 && trackSampleRate->get() > 0;
+    const bool freshNeedlePosition = bHaveSignal && motionSignal &&
+            decodedPosition >= 0 && positionAge <= 0.05 &&
+            std::isfinite(dVinylPitch) && std::abs(dVinylPitch) >= 0.05;
+    if (!needleEligible) {
+        m_needleDrop.reset();
+        m_needleAbsolutePending = false;
+    } else {
+        const bool dropped = m_needleDrop.update(nFrames * timecoder.dt,
+                motionSignal, freshNeedlePosition, decodedPosition / 1000.0,
+                m_requireNeedleReposition);
+        if (dropped && (mode->get() == MIXXX_VCMODE_RELATIVE || m_bAtRecordEnd)) {
+            m_needleAbsolutePending = true;
+        }
+        if (m_needleAbsolutePending) {
+            if (!freshNeedlePosition) {
+                m_needleAbsolutePending = false;
+            } else if (loopEnabled->toBool()) {
+                // Wait for the engine to confirm Off before selecting Absolute,
+                // otherwise its normal loop guard would immediately restore R.
+                loopEnabled->set(0);
+            } else {
+                // This confirmed physical return is an intentional resync. Set
+                // both states together to bypass the manual playing-mode guard;
+                // never force the Play control to change mode.
+                m_iPosition = decodedPosition;
+                m_iVCMode = MIXXX_VCMODE_ABSOLUTE;
+                m_iOldVCMode = MIXXX_VCMODE_ABSOLUTE;
+                m_bAtRecordEnd = false;
+                mode->set(MIXXX_VCMODE_ABSOLUTE);
+                cueing->set(MIXXX_RELATIVE_CUE_OFF);
+                vinylStatus->set(VINYL_STATUS_OK);
+                m_bForceResync = true;
+                m_needleAbsolutePending = false;
+                qInfo() << "Needle drop restored Absolute on" << m_group;
             }
         }
     }

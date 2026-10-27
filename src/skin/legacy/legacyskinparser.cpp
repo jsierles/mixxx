@@ -4,6 +4,7 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QSplitter>
+#include <QSet>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 #include <QtDebug>
@@ -23,6 +24,7 @@
 #include "skin/legacy/launchimage.h"
 #include "skin/legacy/skincontext.h"
 #include "track/track.h"
+#include "track/cue.h"
 #include "util/cmdlineargs.h"
 #include "util/timer.h"
 #include "util/valuetransformer.h"
@@ -54,6 +56,17 @@
 #include "widget/wlabel.h"
 #include "widget/wlibrary.h"
 #include "widget/wlibrarysidebar.h"
+#include "widget/wsimplelibrary.h"
+#include "widget/touchdeckpanel.h"
+#include "mixer/playerinfo.h"
+#include "widget/wtracktableview.h"
+#include "library/simplelibrarymodel.h"
+#include "library/enginedjusblibrary.h"
+#include "library/tidalplaylistlibrary.h"
+#include <QCoreApplication>
+#include <QStandardPaths>
+#include "library/sidebarmodel.h"
+#include <QListView>
 #include "widget/wnumber.h"
 #include "widget/wnumberdb.h"
 #include "widget/wnumberpos.h"
@@ -577,7 +590,7 @@ QList<QWidget*> LegacySkinParser::parseNode(const QDomElement& node) {
         result = wrapWidget(parseCoverArt(node));
     } else if (nodeName == "SearchBox") {
         result = wrapWidget(parseSearchBox(node));
-    } else if (nodeName == "WidgetGroup") {
+    } else if (nodeName == "WidgetGroup" || nodeName == "TouchDeck") {
         result = wrapWidget(parseWidgetGroup(node));
     } else if (nodeName == "TrackWidgetGroup") {
         result = wrapWidget(parseTrackWidgetGroup(node));
@@ -617,6 +630,8 @@ QList<QWidget*> LegacySkinParser::parseNode(const QDomElement& node) {
         result = wrapWidget(parseLibrarySidebar(node));
     } else if (nodeName == "Library") {
         result = wrapWidget(parseLibrary(node));
+    } else if (nodeName == "SimpleLibrary") {
+        result = wrapWidget(parseSimpleLibrary(node));
     } else if (nodeName == "Key") {
         result = wrapWidget(parseEngineKey(node));
     } else if (nodeName == "Battery") {
@@ -748,6 +763,38 @@ QWidget* LegacySkinParser::parseWidgetGroup(const QDomElement& node) {
     setupConnections(node, pGroup);
     pGroup->Init();
     parseChildren(node, pGroup);
+    if (node.tagName() == "TouchDeck") {
+        const int deck = m_pContext->selectInt(node, "Deck") == 2 ? 2 : 1;
+        const QString group = QStringLiteral("[Channel%1]").arg(deck);
+        return new TouchDeckPanel(deck, pGroup,
+                [](const QString& group, const QString& item) {
+                    const ConfigKey key(group, item);
+                    return ControlObject::exists(key) ? ControlObject::get(key) : 0.0;
+                },
+                [](const QString& group, const QString& item, double value) {
+                    const ConfigKey key(group, item);
+                    if (ControlObject::exists(key)) ControlObject::set(key, value);
+                },
+                [group] {
+                    const auto track = PlayerInfo::instance().getTrackInfo(group);
+                    return track ? qMakePair(track->getTitle(), track->getArtist())
+                                 : qMakePair(QString(), QString());
+                },
+                [group] {
+                    QList<TouchDeckPanel::CueText> result;
+                    result.resize(8);
+                    const auto track = PlayerInfo::instance().getTrackInfo(group);
+                    if (!track || !track->getSampleRate().isValid()) return result;
+                    for (const auto& cue : track->getCuePoints()) {
+                        const int slot = cue->getHotCue();
+                        if (slot < 0 || slot >= 8 || !cue->getPosition().isValid()) continue;
+                        result[slot] = {cue->getLabel(),
+                                cue->getPosition().value() / track->getSampleRate().value(),
+                                mixxx::RgbColor::toQColor(cue->getColor())};
+                    }
+                    return result;
+                }, m_pParent, m_pContext->selectInt(node, "Minimal") > 0);
+    }
     return pGroup;
 }
 
@@ -1609,6 +1656,127 @@ QWidget* LegacySkinParser::parseLibrarySidebar(const QDomElement& node) {
     m_pLibrary->bindSidebarWidget(pLibrarySidebar);
     commonWidgetSetup(node, pLibrarySidebar, false);
     return pLibrarySidebar;
+}
+
+QWidget* LegacySkinParser::parseSimpleLibrary(const QDomElement& node) {
+    auto* browser = new WSimpleLibrary(m_pParent);
+    browser->listView()->installEventFilter(m_pKeyboard);
+    browser->installEventFilter(m_pKeyboard);
+    auto* oldParent = m_pParent;
+    m_pParent = browser;
+    // Keep the established Mixxx model, loading and sandbox access plumbing,
+    // but present it through one list rather than a tree and desktop table.
+    auto* library = qobject_cast<WLibrary*>(parseLibrary(node));
+    auto* sidebar = qobject_cast<WLibrarySidebar*>(parseLibrarySidebar(node));
+    m_pParent = oldParent;
+    library->hide();
+    sidebar->hide();
+    auto* model = browser->browserModel();
+    model->setNavigationModel(sidebar->model());
+    auto* engineUsb = new EngineDjUsbLibrary(browser);
+    model->setEngineLibrary(engineUsb);
+    engineUsb->startMonitoring();
+    const QString tidalResources = m_pConfig->getResourcePath() + QStringLiteral("quietvinyl-tidal/");
+    QString tidalPython = qEnvironmentVariable("QUIETVINYL_TIDAL_PYTHON");
+    if (tidalPython.isEmpty()) {
+        tidalPython = m_pConfig->getValueString(ConfigKey("[QuietVinyl]", "TidalPython"));
+    }
+    if (tidalPython.isEmpty()) {
+        const QString bundled = QCoreApplication::applicationDirPath() +
+                QStringLiteral("/../lib/quietvinyl-tidal/venv/bin/python");
+        tidalPython = QFileInfo::exists(bundled) ? bundled : QStringLiteral("python3");
+    }
+    const QString tidalHelper = m_pConfig->getValue<QString>(ConfigKey("[QuietVinyl]", "TidalHelper"),
+            tidalResources + QStringLiteral("quietvinyl_tidal.py"));
+    const QString tidalProfile = m_pConfig->getValue<QString>(ConfigKey("[QuietVinyl]", "TidalProfile"),
+            m_pConfig->getSettingsPath() + QStringLiteral("/tidal"));
+    const QString tidalCache = m_pConfig->getValue<QString>(ConfigKey("[QuietVinyl]", "TidalCache"),
+            QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/tidal"));
+    auto* tidal = new TidalPlaylistLibrary(tidalPython, {tidalHelper}, tidalProfile, tidalCache, browser);
+    browser->setTidalLibrary(tidal);
+    connect(browser, &WSimpleLibrary::loadTidalTrack, browser,
+            [mixxxLibrary = m_pLibrary](const QString& path, const QString& group) {
+                mixxxLibrary->slotLoadLocationToPlayer(path, group, false);
+            });
+    connect(model, &SimpleLibraryModel::activateNode, browser,
+            [sidebar](const QModelIndex& index) {
+                auto* sidebarModel = qobject_cast<SidebarModel*>(sidebar->model());
+                if (!sidebarModel) return;
+                // The hidden tree keeps nodes expanded between visits. Rescan
+                // on re-entry as well, so newly mounted USB drives and changed
+                // folders appear without restarting the application.
+                if (sidebar->isExpanded(index)) sidebarModel->doubleClicked(index);
+                else sidebar->setExpanded(index, true);
+                sidebarModel->clicked(index);
+            });
+    connect(m_pLibrary, &Library::showTrackModel, model,
+            [model](QAbstractItemModel* tracks, bool) {
+                QHash<QString, int> columns;
+                auto* trackModel = dynamic_cast<TrackModel*>(tracks);
+                if (trackModel) {
+                    // Filesystem models expose sort column IDs, but do not
+                    // supply the library SQL models' header-name role.
+                    columns.insert(QStringLiteral("title"), trackModel->columnIndexFromSortColumnId(TrackModel::SortColumnId::Title));
+                    columns.insert(QStringLiteral("artist"), trackModel->columnIndexFromSortColumnId(TrackModel::SortColumnId::Artist));
+                    columns.insert(QStringLiteral("filename"), trackModel->columnIndexFromSortColumnId(TrackModel::SortColumnId::Filename));
+                    columns.insert(QStringLiteral("location"), trackModel->columnIndexFromSortColumnId(TrackModel::SortColumnId::NativeLocation));
+                }
+                model->setTrackModel(tracks, columns);
+            });
+    connect(model, &SimpleLibraryModel::loadTrack, browser,
+            [mixxxLibrary = m_pLibrary, library, engineUsb, browser](const QModelIndex& index, const QString& group, bool play) {
+                if (index.model() == engineUsb->tracks()) {
+                    const auto location = engineUsb->trackLocation(index);
+                    if (location.isEmpty()) return;
+                    const auto data = engineUsb->trackCues(index);
+                    if (data.valid && !data.hotCues.isEmpty()) {
+                        // Apply after Mixxx has decoded the file and restored its
+                        // own cues. Never clear or replace occupied hot-cue slots.
+                        auto apply = [data](const TrackPointer& track) {
+                            const auto rate = track->getSampleRate();
+                            if (!rate.isValid()) return;
+                            QSet<int> occupied;
+                            for (const auto& cue : track->getCuePoints()) {
+                                if (cue->getHotCue() >= 0) occupied.insert(cue->getHotCue());
+                            }
+                            int imported = 0;
+                            for (const auto& cue : data.hotCues) {
+                                if (occupied.contains(cue.slot)) continue;
+                                const auto position = mixxx::audio::FramePos(
+                                        cue.milliseconds * rate.value() / 1000.0);
+                                auto added = track->createAndAddCue(mixxx::CueType::HotCue,
+                                        cue.slot, position, {}, mixxx::RgbColor(cue.rgb));
+                                added->setLabel(cue.label);
+                                ++imported;
+                            }
+                            qInfo() << "Engine DJ imported hot cues" << imported << track->getLocation();
+                        };
+                        const auto current = PlayerInfo::instance().getTrackInfo(group);
+                        if (current && current->getLocation() == location) {
+                            apply(current);
+                        } else {
+                            auto connection = std::make_shared<QMetaObject::Connection>();
+                            *connection = connect(&PlayerInfo::instance(), &PlayerInfo::trackChanged,
+                                    browser, [connection, group, location, apply](
+                                                     const QString& loadedGroup, TrackPointer track, TrackPointer) {
+                                        if (loadedGroup != group) return;
+                                        QObject::disconnect(*connection);
+                                        if (track && track->getLocation() == location) apply(track);
+                                    });
+                        }
+                    }
+                    mixxxLibrary->slotLoadLocationToPlayer(location, group, play);
+                    return;
+                }
+                auto* table = library->getCurrentTrackTableView();
+                if (!table || table->model() != index.model() || !index.isValid()) return;
+                table->selectionModel()->setCurrentIndex(index,
+                        QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+                table->loadSelectedTrackToGroup(group, play);
+            });
+    m_pLibrary->bindSimpleLibrary(browser);
+    commonWidgetSetup(node, browser, false);
+    return browser;
 }
 
 QWidget* LegacySkinParser::parseTableView(const QDomElement& node) {

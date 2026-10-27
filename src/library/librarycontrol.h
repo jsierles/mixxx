@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QObject>
+#include <QPointer>
+#include <array>
 #include <memory>
 
 #include "control/controlproxy.h"
@@ -15,6 +17,7 @@ class WLibrary;
 class WLibrarySidebar;
 class WSearchLineEdit;
 class KeyboardEventFilter;
+class WSimpleLibrary;
 
 class LoadToGroupController : public QObject {
     Q_OBJECT
@@ -43,6 +46,7 @@ class LibraryControl : public QObject {
 
     void bindLibraryWidget(WLibrary* pLibrary, KeyboardEventFilter* pKeyboard);
     void bindSidebarWidget(WLibrarySidebar* pLibrarySidebar);
+    void bindSimpleLibrary(WSimpleLibrary* browser);
     void bindSearchboxWidget(WSearchLineEdit* pSearchbox);
     // Give the keyboard focus to one of the library widgets
     void setLibraryFocus(FocusWidget newFocusWidget);
@@ -83,6 +87,7 @@ class LibraryControl : public QObject {
     void slotMoveTrackDown(double);
     void slotMoveTrack(double);
     void slotGoToItem(double v);
+    void slotBrowseBack(double v);
 
     void slotTrackColorPrev(double v);
     void slotTrackColorNext(double v);
@@ -150,6 +155,23 @@ class LibraryControl : public QObject {
 
     // Control to choose the currently selected item in focused widget (double click)
     std::unique_ptr<ControlObject> m_pGoToItem;
+    std::unique_ptr<ControlPushButton> m_pBrowseBack;
+    std::unique_ptr<ControlEncoder> m_pBrowseMove;
+    std::unique_ptr<ControlPushButton> m_pBrowseSelectPending;
+    std::unique_ptr<ControlPushButton> m_pBrowseSelect;
+    std::unique_ptr<ControlPushButton> m_pBrowseClose;
+    std::unique_ptr<ControlEncoder> m_pBrowseDeck1Move;
+    std::unique_ptr<ControlEncoder> m_pBrowseDeck2Move;
+    std::unique_ptr<ControlPushButton> m_pBrowseDeck1Enter;
+    std::unique_ptr<ControlPushButton> m_pBrowseDeck2Enter;
+    std::unique_ptr<ControlPushButton> m_pBrowseView;
+    std::unique_ptr<ControlPushButton> m_pBrowseResume;
+    std::array<std::unique_ptr<ControlPushButton>, 2> m_pBrowseDeckActivate;
+    std::unique_ptr<ControlPushButton> m_pLoop4BarDeck1;
+    std::unique_ptr<ControlPushButton> m_pLoop4BarDeck2;
+    std::unique_ptr<ControlEncoder> m_pLoopBarsDeck1Move;
+    std::unique_ptr<ControlEncoder> m_pLoopBarsDeck2Move;
+    std::array<int, 2> m_lastLoopKnobMidiValues{{-1, -1}};
 
     // Add to Auto-Dj Queue
     std::unique_ptr<ControlObject> m_pAutoDjAddTop;
@@ -193,6 +215,7 @@ class LibraryControl : public QObject {
 
     // Library widgets
     WLibrary* m_pLibraryWidget;
+    QPointer<WSimpleLibrary> m_pSimpleLibrary;
     WLibrarySidebar* m_pSidebarWidget;
     WSearchLineEdit* m_pSearchbox;
 

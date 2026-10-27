@@ -1,6 +1,10 @@
 #include "library/librarycontrol.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include <QApplication>
+#include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QModelIndex>
 #include <QWindow>
@@ -18,6 +22,7 @@
 #include "widget/wlibrarysidebar.h"
 #include "widget/wsearchlineedit.h"
 #include "widget/wtracktableview.h"
+#include "widget/wsimplelibrary.h"
 
 namespace {
 const QString kAppGroup = QStringLiteral("[App]");
@@ -232,6 +237,134 @@ LibraryControl::LibraryControl(Library* pLibrary)
 
     // Control to "goto" the currently selected item in focused widget (context dependent)
     m_pGoToItem = std::make_unique<ControlPushButton>(ConfigKey("[Library]", "GoToItem"));
+    m_pBrowseBack = std::make_unique<ControlPushButton>(ConfigKey("[Library]", "BrowseBack"));
+    connect(m_pBrowseBack.get(), &ControlPushButton::valueChanged,
+            this, &LibraryControl::slotBrowseBack);
+    m_pBrowseDeck1Move = std::make_unique<ControlEncoder>(
+            ConfigKey("[Library]", "BrowseDeck1Move"), false);
+    m_pBrowseDeck2Move = std::make_unique<ControlEncoder>(
+            ConfigKey("[Library]", "BrowseDeck2Move"), false);
+    m_pBrowseDeck1Enter = std::make_unique<ControlPushButton>(
+            ConfigKey("[Library]", "BrowseDeck1Enter"));
+    m_pBrowseDeck2Enter = std::make_unique<ControlPushButton>(
+            ConfigKey("[Library]", "BrowseDeck2Enter"));
+    m_pBrowseView = std::make_unique<ControlPushButton>(
+            ConfigKey("[Library]", "BrowseView"));
+    m_pBrowseResume = std::make_unique<ControlPushButton>(
+            ConfigKey("[Library]", "BrowseResume"));
+    connect(m_pBrowseResume.get(), &ControlPushButton::valueChanged, this, [this](double v) {
+        if (v > 0 && m_pSimpleLibrary && !QApplication::activeModalWidget() &&
+                !QApplication::activePopupWidget()) m_pSimpleLibrary->resumeBrowsing();
+    });
+    m_pLoop4BarDeck1 = std::make_unique<ControlPushButton>(
+            ConfigKey("[Library]", "Loop4BarDeck1"));
+    m_pLoop4BarDeck2 = std::make_unique<ControlPushButton>(
+            ConfigKey("[Library]", "Loop4BarDeck2"));
+    m_pLoopBarsDeck1Move = std::make_unique<ControlEncoder>(
+            ConfigKey("[Library]", "LoopBarsDeck1Move"), false);
+    m_pLoopBarsDeck2Move = std::make_unique<ControlEncoder>(
+            ConfigKey("[Library]", "LoopBarsDeck2Move"), false);
+    auto canBrowse = [this] {
+        return m_pSimpleLibrary && !QApplication::activeModalWidget() &&
+                !QApplication::activePopupWidget();
+    };
+    m_pBrowseMove = std::make_unique<ControlEncoder>(ConfigKey("[Library]", "BrowseMove"), false);
+    connect(m_pBrowseMove.get(), &ControlEncoder::valueChanged, this, [this, canBrowse](double rows) {
+        if (canBrowse() && m_pSimpleLibrary->isVisible()) m_pSimpleLibrary->moveSelection(int(rows));
+    });
+    m_pBrowseSelectPending = std::make_unique<ControlPushButton>(ConfigKey("[Library]", "BrowseSelectPending"));
+    connect(m_pBrowseSelectPending.get(), &ControlPushButton::valueChanged, this, [this, canBrowse](double value) {
+        if (m_pSimpleLibrary) m_pSimpleLibrary->setControllerSelectionPending(value > 0 && canBrowse());
+    });
+    m_pBrowseSelect = std::make_unique<ControlPushButton>(ConfigKey("[Library]", "BrowseSelect"));
+    connect(m_pBrowseSelect.get(), &ControlPushButton::valueChanged, this, [this, canBrowse](double value) {
+        if (value > 0 && canBrowse()) m_pSimpleLibrary->confirmControllerSelection();
+    });
+    m_pBrowseClose = std::make_unique<ControlPushButton>(ConfigKey("[Library]", "BrowseClose"));
+    connect(m_pBrowseClose.get(), &ControlPushButton::valueChanged, this, [this, canBrowse](double value) {
+        if (value > 0 && canBrowse() && m_pSimpleLibrary->isVisible()) m_pSimpleLibrary->closeBrowser();
+    });
+    for (int deck = 1; deck <= 2; ++deck) {
+        auto& control = m_pBrowseDeckActivate[deck - 1];
+        control = std::make_unique<ControlPushButton>(
+                ConfigKey("[Library]", QStringLiteral("BrowseDeck%1Activate").arg(deck)));
+        connect(control.get(), &ControlPushButton::valueChanged, this,
+                [this, canBrowse, deck](double value) {
+                    if (value <= 0.0 || !canBrowse()) return;
+                    m_pSimpleLibrary->activateForDeck(deck);
+                });
+    }
+    auto browseTimers = std::make_shared<std::array<QElapsedTimer, 2>>();
+    auto moveForDeck = [this, canBrowse, browseTimers](int deck, double steps) {
+        if (!canBrowse() || steps == 0.0) return;
+        auto& timer = (*browseTimers)[deck - 1];
+        if (timer.isValid() && timer.elapsed() < 120) return;
+        timer.start();
+        m_pSimpleLibrary->setTargetDeck(deck);
+        ControlObject::set(ConfigKey("[Skin]", "show_maximized_library"), 1.0);
+        // MiniLab encoders report many events on fast turns. Limit browsing to
+        // one row per event and at most about eight rows per second.
+        m_pSimpleLibrary->moveSelection(steps > 0.0 ? 1 : -1);
+    };
+    auto enterForDeck = [this, canBrowse](int deck, double value) {
+        if (!canBrowse() || value <= 0.0) return;
+        const bool wasVisible = m_pSimpleLibrary->isVisible();
+        m_pSimpleLibrary->setTargetDeck(deck);
+        ControlObject::set(ConfigKey("[Skin]", "show_maximized_library"), 1.0);
+        if (wasVisible) m_pSimpleLibrary->enter();
+    };
+    connect(m_pBrowseDeck1Move.get(), &ControlEncoder::valueChanged,
+            this, [moveForDeck](double steps) { moveForDeck(1, steps); });
+    connect(m_pBrowseDeck2Move.get(), &ControlEncoder::valueChanged,
+            this, [moveForDeck](double steps) { moveForDeck(2, steps); });
+    connect(m_pBrowseDeck1Enter.get(), &ControlPushButton::valueChanged,
+            this, [enterForDeck](double value) { enterForDeck(1, value); });
+    connect(m_pBrowseDeck2Enter.get(), &ControlPushButton::valueChanged,
+            this, [enterForDeck](double value) { enterForDeck(2, value); });
+    connect(m_pBrowseView.get(), &ControlPushButton::valueChanged,
+            this, [canBrowse](double value) {
+                if (value > 0.0 && canBrowse()) {
+                    ControlObject::set(ConfigKey("[Skin]", "show_maximized_library"), 1.0);
+                }
+            });
+    auto loopForDeck = [canBrowse](int deck, double value) {
+                if (!canBrowse()) return;
+                const QString group = QStringLiteral("[Channel%1]").arg(deck);
+                if (value > 0.0 &&
+                        ControlObject::get(ConfigKey(group, "loop_enabled")) <= 0.0) {
+                    // Four bars in the standard four-beat meter.
+                    ControlObject::set(ConfigKey(group, "beatloop_size"), 16.0);
+                }
+                ControlObject::set(ConfigKey(group, "beatloop_activate"), value);
+            };
+    connect(m_pLoop4BarDeck1.get(), &ControlPushButton::valueChanged,
+            this, [loopForDeck](double value) { loopForDeck(1, value); });
+    connect(m_pLoop4BarDeck2.get(), &ControlPushButton::valueChanged,
+            this, [loopForDeck](double value) { loopForDeck(2, value); });
+    auto moveLoopBars = [this, canBrowse](int deck, double rawMidiValue) {
+                if (!canBrowse()) return;
+                const int midiValue = std::clamp(static_cast<int>(std::lround(rawMidiValue)), 0, 127);
+                int& previous = m_lastLoopKnobMidiValues[deck - 1];
+                if (previous < 0) {
+                    previous = midiValue;
+                    return;
+                }
+                int steps = midiValue - previous;
+                previous = midiValue;
+                if (steps > 64) steps -= 128;
+                if (steps < -64) steps += 128;
+                // A preset change can jump the CC position; sync without resizing.
+                if (steps == 0 || std::abs(steps) > 8) return;
+                const QString group = QStringLiteral("[Channel%1]").arg(deck);
+                const double beats = ControlObject::get(ConfigKey(group, "beatloop_size"));
+                const int bars = std::clamp(static_cast<int>(std::lround(beats / 4.0)) +
+                                steps, 1, 128);
+                ControlObject::set(ConfigKey(group, "beatloop_size"), bars * 4.0);
+            };
+    connect(m_pLoopBarsDeck1Move.get(), &ControlEncoder::valueChanged,
+            this, [moveLoopBars](double value) { moveLoopBars(1, value); });
+    connect(m_pLoopBarsDeck2Move.get(), &ControlEncoder::valueChanged,
+            this, [moveLoopBars](double value) { moveLoopBars(2, value); });
 #ifdef MIXXX_USE_QML
     if (!CmdlineArgs::Instance().isQml())
 #endif
@@ -584,6 +717,26 @@ void LibraryControl::bindSearchboxWidget(WSearchLineEdit* pSearchbox) {
             &LibraryControl::searchboxWidgetDeleted);
 }
 
+void LibraryControl::bindSimpleLibrary(WSimpleLibrary* browser) {
+    m_pSimpleLibrary = browser;
+}
+
+void LibraryControl::slotBrowseBack(double v) {
+    if (v <= 0 || !m_pSimpleLibrary || QApplication::activeModalWidget() ||
+            QApplication::activePopupWidget()) {
+        return;
+    }
+    if (m_pSimpleLibrary->isVisible()) {
+        m_pSimpleLibrary->back();
+    } else {
+        const ConfigKey page("[QuietVinyl]", "deck_page");
+        if (ControlObject::exists(page)) {
+            m_pSimpleLibrary->setTargetDeck(ControlObject::get(page) == 1.0 ? 2 : 1);
+        }
+        m_pSimpleLibrary->resumeBrowsing();
+    }
+}
+
 void LibraryControl::libraryWidgetDeleted() {
     m_pLibraryWidget = nullptr;
 }
@@ -601,6 +754,10 @@ void LibraryControl::slotUpdateTrackMenuControl(bool visible) {
 }
 
 void LibraryControl::slotLoadSelectedTrackToGroup(const QString& group, bool play) {
+    if (m_pSimpleLibrary && m_pSimpleLibrary->isVisible()) {
+        if (!QApplication::activeModalWidget() && !QApplication::activePopupWidget()) m_pSimpleLibrary->loadSelected(group, play);
+        return;
+    }
     if (!m_pLibraryWidget) {
         return;
     }
@@ -695,6 +852,10 @@ void LibraryControl::slotMoveVertical(double v) {
     if (v == 0) {
         return;
     }
+    if (m_pSimpleLibrary && m_pSimpleLibrary->isVisible() && !QApplication::activeModalWidget() && !QApplication::activePopupWidget()) {
+        m_pSimpleLibrary->moveSelection(static_cast<int>(v));
+        return;
+    }
 
     switch (m_focusedWidget) {
     case FocusWidget::Sidebar: {
@@ -761,6 +922,10 @@ void LibraryControl::slotScrollDown(double v) {
 }
 
 void LibraryControl::slotScrollVertical(double v) {
+    if (m_pSimpleLibrary && m_pSimpleLibrary->isVisible() && !QApplication::activeModalWidget() && !QApplication::activePopupWidget()) {
+        m_pSimpleLibrary->moveSelection(static_cast<int>(v) * 4);
+        return;
+    }
     const auto key = (v < 0) ? Qt::Key_PageUp : Qt::Key_PageDown;
     const auto times = static_cast<unsigned short>(std::abs(v));
     emitKeyEvent(QKeyEvent{QEvent::KeyPress, key, Qt::NoModifier, QString(), false, times});
@@ -1012,6 +1177,10 @@ void LibraryControl::slotToggleSelectedSidebarItem(double v) {
 
 void LibraryControl::slotGoToItem(double v) {
     if (v <= 0) {
+        return;
+    }
+    if (m_pSimpleLibrary && m_pSimpleLibrary->isVisible() && !QApplication::activeModalWidget() && !QApplication::activePopupWidget()) {
+        m_pSimpleLibrary->enter();
         return;
     }
 

@@ -52,7 +52,8 @@ class PortMidiController : public MidiController {
     PortMidiController(const PmDeviceInfo* inputDeviceInfo,
             const PmDeviceInfo* outputDeviceInfo,
             int inputDeviceIndex,
-            int outputDeviceIndex);
+            int outputDeviceIndex,
+            const QString& identityName = QString{});
     ~PortMidiController() override;
 
   private slots:

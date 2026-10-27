@@ -4,6 +4,11 @@
 
 #include <QRegularExpression>
 
+#ifdef __LINUX__
+#include <alsa/asoundlib.h>
+#include "controllers/midi/denonusbidentity.h"
+#endif
+
 #include "controllers/midi/portmidicontroller.h"
 #include "moc_portmidienumerator.cpp"
 #include "util/cmdlineargs.h"
@@ -97,6 +102,52 @@ bool namesMatchAllowableEdgeCases(const QString& input_name,
     return false;
 }
 
+// PortMidi's ALSA backend enumerates clients and ports in ascending order.
+// Match the complete list of identically named inputs before attaching serials;
+// never guess from a sound-card number or USB enumeration order.
+QMap<int, QString> denonIdentityNames() {
+    QMap<int, QString> result;
+#ifdef __LINUX__
+    const QString name = QStringLiteral("SC6000 Prime Controller");
+    QList<int> indices;
+    for (int i = 0; i < Pm_CountDevices(); ++i) {
+        const auto* info = Pm_GetDeviceInfo(i);
+        if (info && info->input && QString::fromLatin1(info->interf) == QStringLiteral("ALSA") &&
+                QString::fromLocal8Bit(info->name) == name) indices.append(i);
+    }
+    if (indices.isEmpty()) return result;
+    snd_seq_t* seq = nullptr;
+    if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, SND_SEQ_NONBLOCK) < 0) return result;
+    snd_seq_client_info_t* client;
+    snd_seq_port_info_t* port;
+    snd_seq_client_info_alloca(&client);
+    snd_seq_port_info_alloca(&port);
+    QList<QString> serials;
+    snd_seq_client_info_set_client(client, -1);
+    while (snd_seq_query_next_client(seq, client) == 0) {
+        snd_seq_port_info_set_client(port, snd_seq_client_info_get_client(client));
+        snd_seq_port_info_set_port(port, -1);
+        while (snd_seq_query_next_port(seq, port) == 0) {
+            if (!(snd_seq_port_info_get_capability(port) & SND_SEQ_PORT_CAP_SUBS_READ) ||
+                    QString::fromLocal8Bit(snd_seq_port_info_get_name(port)) != name) continue;
+            serials.append(quietvinyl::denonSerialForCard(snd_seq_client_info_get_card(client)));
+        }
+    }
+    snd_seq_close(seq);
+    if (indices.size() != serials.size()) {
+        qWarning() << "Denon enumeration changed; serial assignment withheld until restart";
+        return result;
+    }
+    for (int i = 0; i < indices.size(); ++i) {
+        if (!serials[i].isEmpty() && serials.count(serials[i]) == 1) {
+            result.insert(indices[i], name + QStringLiteral(" ") + serials[i]);
+            qInfo() << "Denon identity" << indices[i] << result.value(indices[i]);
+        }
+    }
+#endif
+    return result;
+}
+
 } // namespace
 
 PortMidiEnumerator::PortMidiEnumerator() {
@@ -181,6 +232,7 @@ QList<Controller*> PortMidiEnumerator::queryDevices() {
     qDebug() << "Scanning PortMIDI devices:";
 
     int iNumDevices = Pm_CountDevices();
+    const auto identityNames = denonIdentityNames();
 
     QListIterator<Controller*> dev_it(m_devices);
     while (dev_it.hasNext()) {
@@ -260,7 +312,8 @@ QList<Controller*> PortMidiEnumerator::queryDevices() {
                 new PortMidiController(inputDeviceInfo,
                         outputDeviceInfo,
                         inputDevIndex,
-                        outputDevIndex);
+                        outputDevIndex,
+                        identityNames.value(inputDevIndex));
         m_devices.push_back(currentDevice);
     }
     return m_devices;

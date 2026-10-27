@@ -10,8 +10,9 @@ const QString kUnknownControllerName = QStringLiteral("Unknown PortMidiControlle
 PortMidiController::PortMidiController(const PmDeviceInfo* inputDeviceInfo,
         const PmDeviceInfo* outputDeviceInfo,
         int inputDeviceIndex,
-        int outputDeviceIndex)
-        : MidiController((inputDeviceInfo || outputDeviceInfo)
+        int outputDeviceIndex,
+        const QString& identityName)
+        : MidiController(!identityName.isEmpty() ? identityName : (inputDeviceInfo || outputDeviceInfo)
                           ? QString::fromLocal8Bit(inputDeviceInfo
                                             ? inputDeviceInfo->name
                                             : outputDeviceInfo->name)
@@ -22,9 +23,6 @@ PortMidiController::PortMidiController(const PmDeviceInfo* inputDeviceInfo,
         m_midiBuffer[k] = {0, 0};
     }
 
-    // Note: We prepend the input stream's index to the device's name to prevent
-    // duplicate devices from causing mayhem.
-    //setDeviceName(QString("%1. %2").arg(QString::number(m_iInputDeviceIndex), inputDeviceInfo->name));
     if (inputDeviceInfo) {
         setInputDevice(inputDeviceInfo->input);
         m_pInputDevice.reset(new PortMidiDevice(

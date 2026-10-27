@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <memory>
 
 #include "control/pollingcontrolproxy.h"
 #include "preferences/usersettings.h"
@@ -9,6 +10,7 @@
 
 class PollingControlProxy;
 class ControlProxy;
+class ControlObject;
 struct VinylSignalQualityReport;
 
 class VinylControl : public QObject {
@@ -27,6 +29,13 @@ class VinylControl : public QObject {
 
     UserSettingsPointer m_pConfig;
     const QString m_group;
+
+    // Decoder telemetry is independent of a loaded track's transport rate.
+    std::unique_ptr<ControlObject> m_browsePitch;
+    std::unique_ptr<ControlObject> m_browseValid;
+    std::unique_ptr<ControlObject> m_browseFrame;
+    std::unique_ptr<ControlObject> m_browseCapture;
+    std::unique_ptr<ControlObject> m_recordMoving;
 
     // The VC input gain preference.
     ControlProxy* m_pVinylControlInputGain;

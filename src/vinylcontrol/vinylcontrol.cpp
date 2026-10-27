@@ -1,6 +1,7 @@
 #include "vinylcontrol/vinylcontrol.h"
 
 #include "control/controlproxy.h"
+#include "control/controlobject.h"
 #include "moc_vinylcontrol.cpp"
 #include "vinylcontrol/defs_vinylcontrol.h"
 
@@ -16,6 +17,11 @@ VinylControl::VinylControl(UserSettingsPointer pConfig, const QString& group)
           m_dVinylPosition(0.0),
           m_fTimecodeQuality(0.0f) {
     // Get Control objects
+    m_browsePitch = std::make_unique<ControlObject>(ConfigKey(group, "vinylbrowse_pitch"));
+    m_recordMoving = std::make_unique<ControlObject>(ConfigKey(group, "vinylcontrol_record_moving"));
+    m_browseValid = std::make_unique<ControlObject>(ConfigKey(group, "vinylbrowse_valid"));
+    m_browseFrame = std::make_unique<ControlObject>(ConfigKey(group, "vinylbrowse_frame"));
+    m_browseCapture = std::make_unique<ControlObject>(ConfigKey(group, "vinylbrowse_capture"));
     m_pVinylControlInputGain = new ControlProxy(VINYL_PREF_KEY, "gain", this);
 
     bool gainOk = false;

@@ -105,6 +105,7 @@ int runMixxx(MixxxApplication* pApp, const CmdlineArgs& args) {
         } else {
             qDebug() << "Displaying main window";
             mainWindow.show();
+            mainWindow.showQuietVinylDeckScreens();
 
             qDebug() << "Running Mixxx";
             exitCode = pApp->exec();

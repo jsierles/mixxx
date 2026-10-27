@@ -899,6 +899,54 @@ ControlPickerMenu::ControlPickerMenu(QWidget* pParent)
                "pane if appropriate"),
             pLibraryMenu);
     // Load track (these can be loaded into any channel)
+    addLibraryControl("BrowseBack",
+            tr("Go up one browser level"),
+            tr("Return to the parent folder or playlist category in the simple library browser"),
+            pLibraryMenu);
+    addLibraryControl("BrowseView",
+            tr("Show compact browser"),
+            tr("Return from the deck display to the simple library browser"),
+            pLibraryMenu);
+    addLibraryControl("BrowseDeck1Move",
+            tr("Browse for deck 1"),
+            tr("Select deck 1 and move through the simple library browser"),
+            pLibraryMenu);
+    addLibraryControl("BrowseDeck1Enter",
+            tr("Open or load for deck 1"),
+            tr("Open a folder or load a track into deck 1"),
+            pLibraryMenu);
+    addLibraryControl("BrowseDeck1Activate",
+            tr("Browse or select for deck 1"),
+            tr("Browse deck 1 from playback, or open/load the highlighted item while browsing it"),
+            pLibraryMenu);
+    addLibraryControl("BrowseDeck2Move",
+            tr("Browse for deck 2"),
+            tr("Select deck 2 and move through the simple library browser"),
+            pLibraryMenu);
+    addLibraryControl("BrowseDeck2Enter",
+            tr("Open or load for deck 2"),
+            tr("Open a folder or load a track into deck 2"),
+            pLibraryMenu);
+    addLibraryControl("BrowseDeck2Activate",
+            tr("Browse or select for deck 2"),
+            tr("Browse deck 2 from playback, or open/load the highlighted item while browsing it"),
+            pLibraryMenu);
+    addLibraryControl("Loop4BarDeck1",
+            tr("Toggle four-bar loop on deck 1"),
+            tr("Start a four-bar loop on deck 1 or stop its active loop"),
+            pLibraryMenu);
+    addLibraryControl("Loop4BarDeck2",
+            tr("Toggle four-bar loop on deck 2"),
+            tr("Start a four-bar loop on deck 2 or stop its active loop"),
+            pLibraryMenu);
+    addLibraryControl("LoopBarsDeck1Move",
+            tr("Adjust deck 1 loop by bars"),
+            tr("Change deck 1 loop length by one bar per controller step"),
+            pLibraryMenu);
+    addLibraryControl("LoopBarsDeck2Move",
+            tr("Adjust deck 2 loop by bars"),
+            tr("Change deck 2 loop length by one bar per controller step"),
+            pLibraryMenu);
     addDeckAndSamplerControl("LoadSelectedTrack",
             tr("Load Track"),
             tr("Load selected track"),

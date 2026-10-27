@@ -61,7 +61,10 @@ SoundManager::SoundManager(UserSettingsPointer pConfig,
     // It is possible to take them out?
     m_pControlObjectSoundStatusCO = new ControlObject(
             ConfigKey("[SoundManager]", "status"));
+    m_pHardwareOutputConnected = new ControlObject(
+            ConfigKey("[SoundManager]", "hardware_output_connected"));
     m_pControlObjectSoundStatusCO->set(SOUNDMANAGER_DISCONNECTED);
+    m_pHardwareOutputConnected->set(0);
 
     m_pControlObjectVinylControlGainCO = new ControlObject(
             ConfigKey(VINYL_PREF_KEY, "gain"));
@@ -99,6 +102,7 @@ SoundManager::~SoundManager() {
     // by clearDeviceList -- bkgood
 
     delete m_pControlObjectSoundStatusCO;
+    delete m_pHardwareOutputConnected;
     delete m_pControlObjectVinylControlGainCO;
 }
 
@@ -199,6 +203,7 @@ void SoundManager::closeDevices(bool sleepAfterClosing) {
 
     // Indicate to the rest of Mixxx that sound is disconnected.
     m_pControlObjectSoundStatusCO->set(SOUNDMANAGER_DISCONNECTED);
+    m_pHardwareOutputConnected->set(0);
 }
 
 void SoundManager::clearDeviceList(bool sleepAfterClosing) {
@@ -336,6 +341,7 @@ SoundDeviceStatus SoundManager::setupDevices() {
     //m_pClkRefDevice = NULL;
     m_pErrorDevice.clear();
     int outputDevicesOpened = 0;
+    int hardwareOutputsOpened = 0;
     int inputDevicesOpened = 0;
 
     // NOTE(rryan): Documenting for future people touching this class. If you
@@ -479,6 +485,9 @@ SoundDeviceStatus SoundManager::setupDevices() {
         devicesNotFound.remove(pDevice->getDeviceId());
         if (mode.isOutput) {
             ++outputDevicesOpened;
+            if (pDevice->getDeviceId().name != kNetworkDeviceInternalName) {
+                ++hardwareOutputsOpened;
+            }
         }
         if (mode.isInput) {
             ++inputDevicesOpened;
@@ -498,6 +507,9 @@ SoundDeviceStatus SoundManager::setupDevices() {
         qWarning() << device << "not found";
     }
 
+    // The network stream may keep the engine alive with zero audio hardware.
+    // Publish actual opened hardware separately for offline recovery UI.
+    m_pHardwareOutputConnected->set(hardwareOutputsOpened > 0 ? 1 : 0);
     m_pControlObjectSoundStatusCO->set(
             outputDevicesOpened > 0 ?
                     SOUNDMANAGER_CONNECTED : SOUNDMANAGER_DISCONNECTED);

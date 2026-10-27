@@ -20,6 +20,7 @@ class BrowseFeature;
 class ControlObject;
 class CrateFeature;
 class LibraryControl;
+class WSimpleLibrary;
 class LibraryFeature;
 class LibraryTableModel;
 class KeyboardEventFilter;
@@ -70,6 +71,7 @@ class Library: public QObject {
     void bindSidebarWidget(WLibrarySidebar* sidebarWidget);
     void bindLibraryWidget(WLibrary* libraryWidget,
                     KeyboardEventFilter* pKeyboard);
+    void bindSimpleLibrary(WSimpleLibrary* browser);
 
     void addFeature(LibraryFeature* feature);
 

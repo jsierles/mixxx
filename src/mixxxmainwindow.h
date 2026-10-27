@@ -47,6 +47,8 @@ class MixxxMainWindow : public QMainWindow {
 #endif
     /// Initialize main window after creation. Should only be called once.
     void initialize();
+    void showQuietVinylDeckScreens();
+    void saveQuietVinylDeckTracks();
     /// creates the menu_bar and inserts the file Menu
     void createMenuBar();
     void connectMenuBar();
@@ -143,6 +145,7 @@ class MixxxMainWindow : public QMainWindow {
     const bool m_supportsGlobalMenuBar;
 #endif
     bool m_inRebootMixxxView;
+    bool m_restoreDeckTracks = false;
 
     DlgDeveloperTools* m_pDeveloperToolsDlg;
 

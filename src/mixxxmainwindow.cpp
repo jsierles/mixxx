@@ -1,11 +1,16 @@
 #include "mixxxmainwindow.h"
+#include "widget/quietvinyldeckscreens.h"
+#include "widget/wsimplelibrary.h"
+#include <QScreen>
 
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QDebug>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QOpenGLContext>
 #include <QUrl>
+#include <algorithm>
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QGLFormat>
@@ -22,6 +27,7 @@
 #endif
 
 #include "controllers/keyboard/keyboardeventfilter.h"
+#include "control/controlobject.h"
 #include "coreservices.h"
 #include "defs_urls.h"
 #include "dialog/dlgabout.h"
@@ -40,6 +46,7 @@
 #endif
 #include "library/trackcollectionmanager.h"
 #include "mixer/playerinfo.h"
+#include "mixer/basetrackplayer.h"
 #include "mixer/playermanager.h"
 #include "recording/recordingmanager.h"
 #include "skin/legacy/launchimage.h"
@@ -53,6 +60,9 @@
 #include "util/scopedoverridecursor.h"
 #include "util/timer.h"
 #include "util/versionstore.h"
+#ifdef __VINYLCONTROL__
+#include "vinylcontrol/defs_vinylcontrol.h"
+#endif
 #include "waveform/guitick.h"
 #include "waveform/sharedglcontext.h"
 #include "waveform/visualsmanager.h"
@@ -319,6 +329,26 @@ void MixxxMainWindow::initialize() {
             Qt::DirectConnection);
 #endif
 
+    // Only the Pi launcher understands exit 75 as an explicit reconnect request.
+    // A fresh process safely reconstructs both PortAudio and PortMidi; live MIDI
+    // list replacement would invalidate preferences' controller pointers.
+    if (!ControlObject::exists(ConfigKey("[QuietVinyl]", "reconnect_devices"))) {
+        auto* available = new ControlObject(ConfigKey("[QuietVinyl]", "reconnect_available"));
+        available->setParent(this);
+        available->set(qEnvironmentVariableIntValue("QUIETVINYL_RECONNECT_ENABLED") == 1 ? 1 : 0);
+        auto* request = new ControlObject(ConfigKey("[QuietVinyl]", "reconnect_devices"));
+        request->setParent(this);
+        connect(request, &ControlObject::valueChanged, this, [this, available](double value) {
+            if (value <= 0 || available->get() <= 0 ||
+                    ControlObject::get(ConfigKey("[SoundManager]", "hardware_output_connected")) > 0 ||
+                    ControlObject::get(ConfigKey("[SoundManager]", "status")) == SOUNDMANAGER_CONNECTING) return;
+            available->set(0); // Latch one request across both screens.
+            saveQuietVinylDeckTracks();
+            qInfo() << "QuietVinyl reconnect requested while audio disconnected";
+            QCoreApplication::exit(75); // Normal destructor/settings shutdown.
+        }, Qt::QueuedConnection);
+    }
+
     // Connect signals to the menubar. Should be done before emit skinLoaded.
     connectMenuBar();
 
@@ -380,6 +410,46 @@ void MixxxMainWindow::initialize() {
     // so it's now safe to write the new config to disk.
     m_pCoreServices->getSoundManager()->getConfig().writeToDisk();
 
+#ifdef __VINYLCONTROL__
+    // The compact QuietVinyl profile can opt into absolute DVS per deck.
+    // Only enable a deck after its configured timecode input has opened.
+    auto pVinylControlManager = m_pCoreServices->getVinylControlManager();
+    for (int deck = 0; deck < 2; ++deck) {
+        const QString setting = QStringLiteral("AutoEnableDvsDeck%1").arg(deck + 1);
+        if (!m_pCoreServices->getSettings()->getValue<bool>(
+                    ConfigKey("[QuietVinyl]", setting), false) ||
+                !pVinylControlManager || !pVinylControlManager->vinylInputConnected(deck)) {
+            continue;
+        }
+        const QString group = QStringLiteral("[Channel%1]").arg(deck + 1);
+        ControlObject::set(ConfigKey(group, "vinylcontrol_mode"), MIXXX_VCMODE_ABSOLUTE);
+        if (ControlObject::get(ConfigKey(group, "vinylcontrol_enabled")) <= 0.0) {
+            pVinylControlManager->toggleVinylControl(deck);
+        }
+    }
+#endif
+
+    // Remember track identity only. Absolute DVS supplies position and transport
+    // from the live record, including after a digital loop used Relative mode.
+    m_restoreDeckTracks = pConfig->getValue<bool>(
+            ConfigKey("[QuietVinyl]", "RestoreDeckTracks"),
+            pConfig->getValueString(ConfigKey("[Config]", "ResizableSkin")) ==
+                    QStringLiteral("QuietVinylBrowser"));
+    if (m_restoreDeckTracks) {
+        for (int deck = 0; deck < std::min(2, pPlayerManager->numberOfDecks()); ++deck) {
+            auto* player = pPlayerManager->getDeckBase(deck);
+            const QString location = pConfig->getValueString(ConfigKey("[QuietVinyl]",
+                    QStringLiteral("Deck%1Track").arg(deck + 1)));
+            // Explicit command-line loads take priority. Missing USB files are
+            // skipped rather than opening a load-error dialog during startup.
+            if (player && !player->getLoadedTrack() &&
+                    QFileInfo(location).isFile() && QFileInfo(location).isReadable()) {
+                qInfo() << "QuietVinyl restoring track on deck" << deck + 1 << location;
+                pPlayerManager->slotLoadToDeck(location, deck + 1);
+            }
+        }
+    }
+
     // this has to be after the OpenGL widgets are created or depending on a
     // million different variables the first waveform may be horribly
     // corrupted. See bug 521509 -- bkgood ?? -- vrince
@@ -435,6 +505,9 @@ void MixxxMainWindow::initialize() {
         qDebug("Enabling Auto DJ from CLI flag.");
         ControlObject::set(ConfigKey("[AutoDJ]", "enabled"), 1.0);
     }
+    // OpenGL can finish initialization asynchronously after main() has shown
+    // the launch image. Present only after the real central widget is ready.
+    QTimer::singleShot(0, this, &MixxxMainWindow::showQuietVinylDeckScreens);
 }
 
 MixxxMainWindow::~MixxxMainWindow() {
@@ -1287,8 +1360,17 @@ void MixxxMainWindow::rebootMixxxView() {
         setGeometry(initGeometry);
     }
 
+    showQuietVinylDeckScreens();
     m_inRebootMixxxView = false;
     qDebug() << "rebootMixxxView DONE";
+}
+
+void MixxxMainWindow::showQuietVinylDeckScreens() {
+    if (!m_pCentralWidget || !m_pCentralWidget->property("quietvinylDualPresentation").toBool()) return;
+    auto screens = QGuiApplication::screens();
+    if (screens.size() < 2) return;
+    std::sort(screens.begin(), screens.end(), [](QScreen* a, QScreen* b) { return a->name() < b->name(); });
+    static_cast<QuietVinylDeckScreens*>(m_pCentralWidget)->present(screens[0], screens[1]);
 }
 
 bool MixxxMainWindow::loadConfiguredSkin() {
@@ -1300,6 +1382,40 @@ bool MixxxMainWindow::loadConfiguredSkin() {
         initializationProgressUpdate(100, "");
     }
     emit skinLoaded();
+    const auto config = m_pCoreServices->getSettings();
+    if (m_pCentralWidget && config->getValue<bool>(ConfigKey("[QuietVinyl]", "DualScreens"), false)) {
+        auto screens = QGuiApplication::screens();
+        std::sort(screens.begin(), screens.end(), [](QScreen* a, QScreen* b) {
+            return a->name() < b->name();
+        });
+        QuietVinylDeckScreens::Pages pages{};
+        for (auto* widget : m_pCentralWidget->findChildren<QWidget*>()) {
+            const int deck = widget->property("quietvinylDeck").toInt();
+            if (deck == 1 || deck == 2)
+                pages[deck - 1][widget->property("quietvinylMinimal").toBool() ? 1 : 0] = widget;
+        }
+        auto* browser = m_pCentralWidget->findChild<WSimpleLibrary*>();
+        const bool available = screens.size() >= 2 && browser &&
+                pages[0][0] && pages[0][1] && pages[1][0] && pages[1][1];
+        const ConfigKey dual("[QuietVinyl]", "dual_screen");
+        if (auto* control = ControlObject::getControl(dual)) control->forceSet(available ? 1 : 0);
+        if (available) {
+            auto* presentation = new QuietVinylDeckScreens(m_pCentralWidget, pages, browser,
+                    [](const QString& group, const QString& item) {
+                        const ConfigKey key(group, item);
+                        return ControlObject::exists(key) ? ControlObject::get(key) : 0.0;
+                    }, this);
+            presentation->secondaryWindow()->installEventFilter(
+                    m_pCoreServices->getKeyboardEventFilter().get());
+            // Keep menu shortcuts usable while deck 2 owns keyboard focus.
+            for (auto* action : m_pMenuBar->findChildren<QAction*>())
+                presentation->secondaryWindow()->addAction(action);
+            m_pCentralWidget = presentation;
+
+        } else {
+            qWarning() << "QuietVinyl dual screens unavailable; using single-screen layout";
+        }
+    }
     return m_pCentralWidget != nullptr;
 }
 
@@ -1399,6 +1515,20 @@ bool MixxxMainWindow::eventFilter(QObject* obj, QEvent* event) {
     return QMainWindow::eventFilter(obj, event);
 }
 
+void MixxxMainWindow::saveQuietVinylDeckTracks() {
+    if (m_restoreDeckTracks) {
+        auto pConfig = m_pCoreServices->getSettings();
+        auto pPlayers = m_pCoreServices->getPlayerManager();
+        for (int deck = 0; deck < std::min(2, pPlayers->numberOfDecks()); ++deck) {
+            auto* player = pPlayers->getDeckBase(deck);
+            const auto track = player ? player->getLoadedTrack() : TrackPointer();
+            pConfig->setValue(ConfigKey("[QuietVinyl]",
+                                     QStringLiteral("Deck%1Track").arg(deck + 1)),
+                    track ? track->getLocation() : QString());
+        }
+    }
+}
+
 void MixxxMainWindow::closeEvent(QCloseEvent *event) {
     // WARNING: We can receive a CloseEvent while only partially
     // initialized. This is because we call QApplication::processEvents to
@@ -1407,7 +1537,14 @@ void MixxxMainWindow::closeEvent(QCloseEvent *event) {
         event->ignore();
         return;
     }
+    saveQuietVinylDeckTracks();
     QMainWindow::closeEvent(event);
+    if (event->isAccepted() && m_pCoreServices->getSettings()->getValue<bool>(
+                ConfigKey("[QuietVinyl]", "DualScreens"), false)) {
+        // A second top-level deck window prevents Qt's last-window-close exit.
+        // Only quit after the normal confirmation and track-state save above.
+        QCoreApplication::exit(0);
+    }
 }
 
 void MixxxMainWindow::checkDirectRendering() {

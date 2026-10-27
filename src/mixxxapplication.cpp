@@ -1,4 +1,5 @@
 #include "mixxxapplication.h"
+#include <QPointer>
 
 #include <QThreadPool>
 #include <QTouchEvent>
@@ -212,10 +213,14 @@ bool MixxxApplication::notify(QObject* pTarget, QEvent* pEvent) {
         time.start();
     }
 
+    // A process/socket callback can destroy its event receiver synchronously.
+    // Developer timing diagnostics must not dereference it after delivery.
+    const QPointer<QObject> target(pTarget);
+    const auto eventType = pEvent->type();
     bool ret = QApplication::notify(pTarget, pEvent);
 
     VERIFY_OR_DEBUG_ASSERT(pTarget != nullptr) {
-        qWarning() << "Processed" << pEvent->type() << "for null pointer, this is probably a bug!";
+        qWarning() << "Processed" << eventType << "for null pointer, this is probably a bug!";
         return ret;
     }
 
@@ -223,17 +228,17 @@ bool MixxxApplication::notify(QObject* pTarget, QEvent* pEvent) {
             time.elapsed() > m_eventNotifyExecTimeWarningThreshold) {
         QDebug debug = qDebug();
         debug << "Processing"
-              << pEvent->type()
+              << eventType
               << "for object";
-        if (pEvent->type() == QEvent::DeferredDelete ||
-                pEvent->type() == QEvent::ChildRemoved ||
-                pEvent->type() == QEvent::Timer) {
+        if (!target || eventType == QEvent::DeferredDelete ||
+                eventType == QEvent::ChildRemoved ||
+                eventType == QEvent::Timer) {
             // pTarget can be already dangling in case of DeferredDelete
             debug << static_cast<void*>(pTarget); // will print dangling address
         } else {
-            debug << pTarget // will print address, class and object name
+            debug << target.data() // will print address, class and object name
                   << "running in thread:"
-                  << pTarget->thread()->objectName();
+                  << target->thread()->objectName();
         }
         debug << "took"
               << time.elapsed().debugMillisWithUnit();

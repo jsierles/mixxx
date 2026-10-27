@@ -5,6 +5,8 @@
 
 #include "util/types.h"
 #include "vinylcontrol/vinylcontrol.h"
+#include "vinylcontrol/needledropdetector.h"
+#include "vinylcontrol/vinylbrowsesignalloss.h"
 
 #ifdef _MSC_VER
 #include "timecoder.h"
@@ -52,6 +54,12 @@ class VinylControlXwax : public VinylControl {
     void establishQuality(double& pitch);
     int getPositionQuality();
     int getPitchQuality(double& pitch);
+
+    NeedleDropDetector m_needleDrop;
+    VinylBrowseSignalLoss m_browseSignalLoss;
+    bool m_autoAbsoluteOnNeedleDrop = false;
+    bool m_requireNeedleReposition = false;
+    bool m_needleAbsolutePending = false;
 
     // Cache the position of the end of record
     unsigned int m_uiSafeZone;

@@ -985,6 +985,10 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/library/library_prefs.cpp
   src/library/library.cpp
   src/library/librarycontrol.cpp
+  src/library/enginedjcueparser.cpp
+  src/library/enginedjusblibrary.cpp
+  src/library/simplelibrarymodel.cpp
+  src/library/tidalplaylistlibrary.cpp
   src/library/libraryfeature.cpp
   src/library/librarytablemodel.cpp
   src/library/missing_hidden/dlghidden.cpp
@@ -1324,6 +1328,9 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/widget/wknobcomposed.cpp
   src/widget/wlabel.cpp
   src/widget/wlibrary.cpp
+  src/widget/browserpresentation.cpp
+  src/widget/touchdeckpanel.cpp
+  src/widget/wsimplelibrary.cpp
   src/widget/wlibrarysidebar.cpp
   src/widget/wlibrarytableview.cpp
   src/widget/wlibrarytextbrowser.cpp
@@ -2402,6 +2409,8 @@ if(NOT Chromaprint_FOUND)
   # Fail verbose, because with Qt Creator, the verbose error message for Qt is bypassed.
   FATAL_ERROR_MISSING_ENV()
 endif()
+find_package(ZLIB REQUIRED)
+target_link_libraries(mixxx-lib PRIVATE ZLIB::ZLIB)
 target_link_libraries(mixxx-lib PRIVATE Chromaprint::Chromaprint)
 
 # Locale Aware Compare for SQLite
@@ -2776,6 +2785,10 @@ if(PORTMIDI)
   find_package(PortMidi REQUIRED)
   target_include_directories(mixxx-lib SYSTEM PUBLIC ${PortMidi_INCLUDE_DIRS})
   target_link_libraries(mixxx-lib PRIVATE ${PortMidi_LIBRARIES})
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(ALSA REQUIRED)
+    target_link_libraries(mixxx-lib PRIVATE ALSA::ALSA)
+  endif()
   target_sources(mixxx-lib PRIVATE
     src/controllers/midi/portmidicontroller.cpp
     src/controllers/midi/portmidienumerator.cpp

@@ -466,6 +466,10 @@ void Library::bindLibraryWidget(
     emit setSelectedClick(m_editMetadataSelectedClick);
 }
 
+void Library::bindSimpleLibrary(WSimpleLibrary* browser) {
+    m_pLibraryControl->bindSimpleLibrary(browser);
+}
+
 void Library::addFeature(LibraryFeature* feature) {
     VERIFY_OR_DEBUG_ASSERT(feature) {
         return;
