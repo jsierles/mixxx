@@ -49,7 +49,32 @@ BrowserHeader::BrowserHeader(Action back, Action close, Action switchView, QWidg
         : QLabel(parent), m_back(std::move(back)), m_close(std::move(close)),
           m_switchView(std::move(switchView)) {
     setAttribute(Qt::WA_AcceptTouchEvents);
-    setAccessibleName(tr("Browser navigation: swipe right back, down close, double tap switch view"));
+    setAccessibleName(tr("Browser navigation: Back, Close, or swipe right back, down close, double tap switch view"));
+    m_backButton = new QPushButton(tr("Back"), this);
+    m_closeButton = new QPushButton(tr("Close"), this);
+    m_backButton->setObjectName(QStringLiteral("BrowserBack"));
+    m_closeButton->setObjectName(QStringLiteral("BrowserClose"));
+    for (auto* button : {m_backButton, m_closeButton}) {
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setStyleSheet(QStringLiteral(
+                "background:#20281f; color:#e1c789; border:1px solid #556047;"
+                "border-radius:3px; font-size:22px; padding:0;"));
+    }
+    // Keep the existing deck indicator clear at the far right. These children
+    // travel with the browser when the dual-screen host changes its destination.
+    setContentsMargins(104, 0, 192, 0);
+    connect(m_backButton, &QPushButton::clicked, this, [this] {
+        m_tracking = false; m_lastTap.invalidate(); m_back();
+    });
+    connect(m_closeButton, &QPushButton::clicked, this, [this] {
+        m_tracking = false; m_lastTap.invalidate(); m_close();
+    });
+}
+
+void BrowserHeader::resizeEvent(QResizeEvent* event) {
+    QLabel::resizeEvent(event);
+    m_backButton->setGeometry(4, 4, 96, height() - 8);
+    m_closeButton->setGeometry(width() - 184, 4, 96, height() - 8);
 }
 
 void BrowserHeader::finish(const QPointF& position) {

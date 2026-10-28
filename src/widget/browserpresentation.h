@@ -21,14 +21,17 @@ class DeckIndicator : public QPushButton {
     void positionAtTopRight();
 };
 
-// A gesture surface keeps the browser usable without an action-button bar.
+// Visible navigation and a gesture surface share the same guarded browser actions.
 class BrowserHeader : public QLabel {
   public:
     using Action = std::function<void()>;
     BrowserHeader(Action back, Action close, Action switchView, QWidget* parent = nullptr);
   protected:
     bool event(QEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
   private:
+    QPushButton* m_backButton;
+    QPushButton* m_closeButton;
     void finish(const QPointF& position);
     Action m_back, m_close, m_switchView;
     QPointF m_start, m_lastTapPosition;

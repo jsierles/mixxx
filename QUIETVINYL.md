@@ -60,3 +60,11 @@ Popup screen bounds now account for negative display origins; geometry tests
 live in the companion repository. Physical multi-display focus/action testing
 remains necessary. The macOS bundle installer also quotes application names
 containing spaces.
+
+## Touch browser navigation
+
+The browser header includes 56-pixel-high Back and Close buttons. They use the
+same actions as header swipes: Back returns one level and closes at Music;
+Close returns to playback. The buttons move with the browser between fixed
+deck windows. Header gestures remain available, and song loading still requires
+an explicit stationary hold or controller selection.
