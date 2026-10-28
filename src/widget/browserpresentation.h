@@ -32,6 +32,8 @@ class BrowserHeader : public QLabel {
   private:
     QPushButton* m_backButton;
     QPushButton* m_closeButton;
+    QPushButton* m_touchButton = nullptr;
+    bool m_touchButtonMoved = false;
     void finish(const QPointF& position);
     Action m_back, m_close, m_switchView;
     QPointF m_start, m_lastTapPosition;

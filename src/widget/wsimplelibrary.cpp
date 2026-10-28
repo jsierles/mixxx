@@ -151,7 +151,7 @@ WSimpleLibrary::WSimpleLibrary(QWidget* parent)
     m_breadcrumb->setFixedHeight(64);
     m_breadcrumb->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     m_breadcrumb->setStyleSheet(QStringLiteral(
-            "color:#aeb59d; background:#111713; padding-left:12px; font-size:12px;"));
+            "color:#aeb59d; background:#111713; padding-left:104px; padding-right:192px; font-size:12px;"));
     m_list->setObjectName(QStringLiteral("BrowserList"));
     m_list->setModel(m_model);
     m_list->setItemDelegate(new BrowserDelegate(this, m_list));
@@ -450,7 +450,7 @@ void WSimpleLibrary::refreshDeckColors() {
     const QString accent = m_targetDeck == 1 ? QStringLiteral("#e1c789")
                                              : QStringLiteral("#81cfce");
     m_breadcrumb->setStyleSheet(QStringLiteral(
-            "color:%1; background:#111713; padding-left:16px; padding-right:88px; font-size:12px; font-weight:bold;")
+            "color:%1; background:#111713; padding-left:104px; padding-right:192px; font-size:12px; font-weight:bold;")
                     .arg(accent));
     m_list->viewport()->update();
     refreshBreadcrumb();

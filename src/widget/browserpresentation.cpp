@@ -62,7 +62,7 @@ BrowserHeader::BrowserHeader(Action back, Action close, Action switchView, QWidg
     }
     // Keep the existing deck indicator clear at the far right. These children
     // travel with the browser when the dual-screen host changes its destination.
-    setContentsMargins(88, 0, 104, 0);
+    setStyleSheet(QStringLiteral("padding-left:104px; padding-right:192px;"));
     connect(m_backButton, &QPushButton::clicked, this, [this] {
         m_tracking = false; m_lastTap.invalidate(); m_back();
     });
@@ -114,9 +114,33 @@ bool BrowserHeader::event(QEvent* event) {
     case QEvent::TouchEnd: {
         auto* touch = static_cast<QTouchEvent*>(event);
         if (touch->points().size() != 1) {
+            if (m_touchButton) m_touchButton->setDown(false);
+            m_touchButton = nullptr;
             m_tracking = false; m_lastTap.invalidate();
         } else if (event->type() == QEvent::TouchBegin) {
-            m_tracking = true; m_start = touch->points().first().globalPosition();
+            m_start = touch->points().first().globalPosition();
+            // Native touch is delivered to this accepting ancestor instead of
+            // synthesizing a mouse click for its ordinary QPushButton children.
+            for (auto* button : {m_backButton, m_closeButton}) {
+                if (button->geometry().contains(touch->points().first().position().toPoint())) {
+                    m_touchButton = button;
+                    m_touchButtonMoved = false;
+                    button->setDown(true);
+                    m_lastTap.invalidate();
+                    break;
+                }
+            }
+            m_tracking = !m_touchButton;
+        } else if (m_touchButton) {
+            auto* button = m_touchButton;
+            if ((touch->points().first().globalPosition() - m_start).manhattanLength() > 12)
+                m_touchButtonMoved = true;
+            if (event->type() == QEvent::TouchEnd) {
+                m_touchButton = nullptr;
+                button->setDown(false);
+                if (!m_touchButtonMoved && button->geometry().contains(
+                            touch->points().first().position().toPoint())) button->click();
+            }
         } else if (event->type() == QEvent::TouchEnd) {
             finish(touch->points().first().globalPosition());
         }
@@ -124,6 +148,8 @@ bool BrowserHeader::event(QEvent* event) {
     }
     case QEvent::TouchCancel:
     case QEvent::Hide:
+        if (m_touchButton) m_touchButton->setDown(false);
+        m_touchButton = nullptr;
         m_tracking = false; m_lastTap.invalidate(); break;
     default: break;
     }
