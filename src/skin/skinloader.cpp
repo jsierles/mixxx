@@ -1,6 +1,8 @@
 #include "skin/skinloader.h"
 
 #include <QDir>
+#include <QCoreApplication>
+#include <QFileInfo>
 #include <QString>
 #include <QtDebug>
 
@@ -97,6 +99,11 @@ SkinPointer SkinLoader::getConfiguredSkin() const {
         if (!oldSkin.isEmpty()) {
             configSkin = pickResizableSkin(oldSkin);
         }
+    }
+
+    // The dedicated preparation bundle opens directly into its bundled editor.
+    if (configSkin.isEmpty() && QFileInfo(QCoreApplication::applicationFilePath()).completeBaseName() == "QuietVinyl Prepare") {
+        configSkin = "QuietVinylPreparation";
     }
 
     // Pick default skin otherwise

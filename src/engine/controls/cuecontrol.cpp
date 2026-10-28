@@ -674,6 +674,7 @@ void CueControl::loadCuesFromTrack() {
             m_n60dBSoundStartPosition.setValue(pos.startPosition.toEngineSamplePos());
             break;
         }
+        case mixxx::CueType::Downbeat:
         case mixxx::CueType::Beat:
         case mixxx::CueType::Jump:
         case mixxx::CueType::Invalid:

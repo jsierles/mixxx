@@ -2,6 +2,8 @@
 
 #include <QListWidget>
 #include <QPoint>
+#include <QRect>
+#include <algorithm>
 #include <QSize>
 #include <QWidget>
 #include <QWindow>
@@ -11,6 +13,14 @@
 namespace mixxx {
 
 namespace widgethelper {
+
+/// Clamp a popup to any screen origin, including negative virtual coordinates.
+inline QPoint constrainPopupToScreen(const QRect& screen, const QPoint& point, const QSize& size) {
+    const auto right = std::max(screen.left(), screen.right() - size.width() + 1);
+    const auto bottom = std::max(screen.top(), screen.bottom() - size.height() + 1);
+    return QPoint(std::clamp(point.x(), screen.left(), right),
+            std::clamp(point.y(), screen.top(), bottom));
+}
 
 /// Returns an adjusted upper left point for displaying the popup
 /// with the given size on the screen, shifting the popup if it would go off

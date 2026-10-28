@@ -187,6 +187,9 @@ void WHotcueButton::slotTypeChanged(double type) {
     case mixxx::CueType::MainCue:
         m_type = QStringLiteral("maincue");
         break;
+    case mixxx::CueType::Downbeat:
+        m_type = QStringLiteral("downbeat");
+        break;
     case mixxx::CueType::Beat:
         m_type = QStringLiteral("beat");
         break;

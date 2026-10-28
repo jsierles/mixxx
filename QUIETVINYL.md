@@ -38,3 +38,25 @@ not a merge parent or build dependency: our UI uses a separately maintained
 Python helper and verified local-file cache. Do not automatically merge either
 remote or upgrade the release base. Future contributions upstream should isolate
 generally useful fixes from QuietVinyl's product choices.
+
+## Mac preparation application
+
+The optional companion `QuietVinylPreparation` skin uses `[Preparation],enabled`
+to expose paused-track analysis/re-analysis, explicit 4/4 downbeat setting,
+one-beat bar-phase shifts, downbeat undo and periodic saved-preparation updates.
+A confirmed downbeat is stored as cue type **9**, hotcue index -1, with the
+standard engine-sample position representation. It is a preparation marker,
+not a playable hotcue. Re-analysis clears it; small grid changes snap it back
+to the nearest beat. The companion converters validate it against the grid.
+Other skins do not enable these preparation operations by default.
+
+A bundle named `QuietVinyl Prepare` defaults to the preparation skin and can
+start the separately bundled sync observer for the current profile. The observer
+and player-format generators belong to the companion repository. Normal Mixxx
+profiles and the Pi playback application retain their existing startup paths.
+The companion's preparation guide records native UI and conversion tests.
+
+Popup screen bounds now account for negative display origins; geometry tests
+live in the companion repository. Physical multi-display focus/action testing
+remains necessary. The macOS bundle installer also quotes application names
+containing spaces.

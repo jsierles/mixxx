@@ -4,6 +4,11 @@
 #include <QObject>
 #include <QUrl>
 #include <QVariant>
+#include <QTimer>
+#include <vector>
+#include "control/controlobject.h"
+#include "control/controlpushbutton.h"
+#include "track/track_decl.h"
 
 #include "analyzer/trackanalysisscheduler.h"
 #include "library/libraryfeature.h"
@@ -58,6 +63,22 @@ class AnalysisFeature : public LibraryFeature {
     // tracks in the job
     void setTitleProgress(int currentTrackNumber, int totalTracksCount);
 
+    void analyzePreparationTrack(bool replaceGrid);
+    void changePreparationDownbeat(int beats, bool undo = false);
+    void refreshPreparation();
+    void configurePreparationSync();
+    void startPreparationSync();
+    void showPreparationSyncStatus();
+    void showPreparationUsb();
+    bool m_preparationSyncStarted = false;
+    std::vector<std::unique_ptr<ControlPushButton>> m_preparationButtons;
+    std::unique_ptr<ControlObject> m_preparationEnabled;
+    std::unique_ptr<ControlObject> m_preparationDownbeat;
+    std::unique_ptr<ControlObject> m_preparationConfirmed;
+    std::unique_ptr<ControlObject> m_preparationAnalyzing;
+    QTimer m_preparationTimer;
+    TrackPointer m_preparationUndoTrack;
+    std::vector<double> m_downbeatUndo;
     const QString m_baseTitle;
 
     TrackAnalysisScheduler::Pointer m_pTrackAnalysisScheduler;

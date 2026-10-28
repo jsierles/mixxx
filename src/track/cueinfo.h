@@ -17,6 +17,8 @@ enum class CueType {
     Jump = 5,
     Intro = 6,
     Outro = 7,
+    // QuietVinyl: confirmed beat one of a 4/4 bar; never a playable hot cue.
+    Downbeat = 9,
     N60dBSound = 8, // range that covers beginning and end of audible
                     // sound; not shown to user
 };
