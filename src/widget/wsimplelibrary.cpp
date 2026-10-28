@@ -459,7 +459,7 @@ void WSimpleLibrary::refreshDeckColors() {
 void WSimpleLibrary::refreshBreadcrumb() {
     const QString label = m_breadcrumbText;
     m_breadcrumb->setText(m_breadcrumb->fontMetrics().elidedText(
-            label, Qt::ElideMiddle, std::max(0, width() - 108)));
+            label, Qt::ElideMiddle, std::max(0, m_breadcrumb->contentsRect().width())));
     m_breadcrumb->setToolTip(tr("Deck %1 · %2").arg(m_targetDeck).arg(label));
 }
 

@@ -62,7 +62,7 @@ BrowserHeader::BrowserHeader(Action back, Action close, Action switchView, QWidg
     }
     // Keep the existing deck indicator clear at the far right. These children
     // travel with the browser when the dual-screen host changes its destination.
-    setContentsMargins(104, 0, 192, 0);
+    setContentsMargins(88, 0, 104, 0);
     connect(m_backButton, &QPushButton::clicked, this, [this] {
         m_tracking = false; m_lastTap.invalidate(); m_back();
     });
