@@ -1,10 +1,13 @@
 #include "widget/wtracktableviewheader.h"
 
 #include <QCheckBox>
+#include <QCoreApplication>
 #include <QContextMenuEvent>
+#include <QFileInfo>
 #include <QWidgetAction>
 
 #include "library/trackmodel.h"
+#include "library/dao/trackschema.h"
 #include "moc_wtracktableviewheader.cpp"
 #include "util/math.h"
 #include "util/parented_ptr.h"
@@ -234,6 +237,7 @@ void WTrackTableViewHeader::setModel(QAbstractItemModel* pModel) {
             showSection(i);
         }
     }
+
 }
 
 void WTrackTableViewHeader::saveHeaderState() {
@@ -266,6 +270,29 @@ void WTrackTableViewHeader::restoreHeaderState() {
             loadDefaultHeaderState();
         } else {
             view_state.restoreState(this);
+        }
+    }
+    // Apply the preparation preset once per model, then retain subsequent
+    // user choices through the normal header-state persistence.
+    if (QFileInfo(QCoreApplication::applicationFilePath()).completeBaseName() == "QuietVinyl Prepare" &&
+            pTrackModel->getModelSetting("preparation_columns_version") != "1") {
+        const QList<QPair<QString, int>> columns = {
+                {LIBRARYTABLE_COVERART, 56}, {LIBRARYTABLE_PREVIEW, 50},
+                {LIBRARYTABLE_TITLE, 260}, {LIBRARYTABLE_ALBUM, 180},
+                {LIBRARYTABLE_ARTIST, 160}, {LIBRARYTABLE_DURATION, 80},
+                {LIBRARYTABLE_BPM, 75}, {LIBRARYTABLE_KEY, 70}};
+        if (pTrackModel->fieldIndex(LIBRARYTABLE_TITLE) >= 0) {
+            for (int i = 0; i < count(); ++i) hideSection(i);
+            int position = 0;
+            for (const auto& column : columns) {
+                const int logical = pTrackModel->fieldIndex(column.first);
+                if (logical < 0 || pTrackModel->isColumnInternal(logical)) continue;
+                showSection(logical);
+                moveSection(visualIndex(logical), position++);
+                resizeSection(logical, column.second);
+            }
+            saveHeaderState();
+            pTrackModel->setModelSetting("preparation_columns_version", "1");
         }
     }
 }

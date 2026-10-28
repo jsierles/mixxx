@@ -68,3 +68,12 @@ same actions as header swipes: Back returns one level and closes at Music;
 Close returns to playback. The buttons move with the browser between fixed
 deck windows. Header gestures remain available, and song loading still requires
 an explicit stationary hold or controller selection.
+
+## Preparation song lists
+
+The separately named QuietVinyl Prepare app initializes each track model once
+with Cover Art, Preview, Title, Album, Artist, Duration, BPM and Key columns.
+It starts with 48-pixel rows; ordinary saved header state and Library row-height
+preferences retain later user adjustments. The preset does not change playlist
+ordering or audio metadata. Cover art fits inside the cell with its full aspect
+ratio, centered and uncropped even when the row is shorter than the column.

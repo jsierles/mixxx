@@ -2,6 +2,7 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QFileInfo>
 #include <QMessageBox>
 
 #include "control/controlobject.h"
@@ -244,6 +245,11 @@ Library::Library(
         }
     }
 
+    if (QFileInfo(QCoreApplication::applicationFilePath()).completeBaseName() == "QuietVinyl Prepare" &&
+            m_pConfig->getValue<int>(ConfigKey("[QuietVinylPreparation]", "song_list_version"), 0) < 1) {
+        m_pConfig->set(ConfigKey(kConfigGroup, "RowHeight"), ConfigValue(48));
+        m_pConfig->set(ConfigKey("[QuietVinylPreparation]", "song_list_version"), ConfigValue(1));
+    }
     m_iTrackTableRowHeight = m_pConfig->getValue(
             ConfigKey(kConfigGroup, "RowHeight"), kDefaultRowHeightPx);
     QString fontStr =

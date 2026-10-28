@@ -1,6 +1,7 @@
 #include "library/tabledelegates/coverartdelegate.h"
 
 #include <QPainter>
+#include <QHeaderView>
 #include <QTableView>
 #include <algorithm>
 
@@ -88,7 +89,8 @@ void CoverArtDelegate::slotInhibitLazyLoading(
         return;
     }
     const double scaleFactor = m_pTableView->devicePixelRatioF();
-    const int width = static_cast<int>(m_pTableView->columnWidth(m_column) * scaleFactor);
+    const int width = static_cast<int>(qMin(m_pTableView->columnWidth(m_column),
+            m_pTableView->verticalHeader()->defaultSectionSize()) * scaleFactor);
 
     for (int row : std::as_const(m_cacheMissRows)) {
         const QModelIndex index = m_pTableView->model()->index(row, m_column);
@@ -135,7 +137,7 @@ void CoverArtDelegate::paintItem(
             return;
         }
         const double scaleFactor = m_pTableView->devicePixelRatioF();
-        const int width = static_cast<int>(option.rect.width() * scaleFactor);
+        const int width = qMax(1, static_cast<int>(qMin(option.rect.width(), option.rect.height()) * scaleFactor));
         QPixmap pixmap = CoverArtCache::getCachedCover(coverInfo, width);
         if (pixmap.isNull()) {
             // Cache miss
@@ -152,7 +154,11 @@ void CoverArtDelegate::paintItem(
         } else {
             // Cache hit
             pixmap.setDevicePixelRatio(scaleFactor);
-            painter->drawPixmap(option.rect.topLeft(), pixmap);
+            const QSize fitted = (pixmap.size() / scaleFactor).scaled(
+                    option.rect.size(), Qt::KeepAspectRatio);
+            QRect destination(QPoint(), fitted);
+            destination.moveCenter(option.rect.center());
+            painter->drawPixmap(destination, pixmap);
             drewPixmap = true;
         }
     }
