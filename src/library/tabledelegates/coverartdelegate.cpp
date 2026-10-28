@@ -158,6 +158,7 @@ void CoverArtDelegate::paintItem(
                     option.rect.size(), Qt::KeepAspectRatio);
             QRect destination(QPoint(), fitted);
             destination.moveCenter(option.rect.center());
+            painter->setRenderHint(QPainter::SmoothPixmapTransform);
             painter->drawPixmap(destination, pixmap);
             drewPixmap = true;
         }

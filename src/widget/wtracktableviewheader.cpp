@@ -275,12 +275,12 @@ void WTrackTableViewHeader::restoreHeaderState() {
     // Apply the preparation preset once per model, then retain subsequent
     // user choices through the normal header-state persistence.
     if (QFileInfo(QCoreApplication::applicationFilePath()).completeBaseName() == "QuietVinyl Prepare" &&
-            pTrackModel->getModelSetting("preparation_columns_version") != "1") {
+            pTrackModel->getModelSetting("preparation_columns_version") != "2") {
         const QList<QPair<QString, int>> columns = {
-                {LIBRARYTABLE_COVERART, 56}, {LIBRARYTABLE_PREVIEW, 50},
-                {LIBRARYTABLE_TITLE, 260}, {LIBRARYTABLE_ALBUM, 180},
-                {LIBRARYTABLE_ARTIST, 160}, {LIBRARYTABLE_DURATION, 80},
-                {LIBRARYTABLE_BPM, 75}, {LIBRARYTABLE_KEY, 70}};
+                {LIBRARYTABLE_COVERART, 80}, {LIBRARYTABLE_PREVIEW, 72},
+                {LIBRARYTABLE_TITLE, 300}, {LIBRARYTABLE_ALBUM, 200},
+                {LIBRARYTABLE_ARTIST, 170}, {LIBRARYTABLE_DURATION, 90},
+                {LIBRARYTABLE_BPM, 110}, {LIBRARYTABLE_KEY, 80}};
         if (pTrackModel->fieldIndex(LIBRARYTABLE_TITLE) >= 0) {
             for (int i = 0; i < count(); ++i) hideSection(i);
             int position = 0;
@@ -292,7 +292,7 @@ void WTrackTableViewHeader::restoreHeaderState() {
                 resizeSection(logical, column.second);
             }
             saveHeaderState();
-            pTrackModel->setModelSetting("preparation_columns_version", "1");
+            pTrackModel->setModelSetting("preparation_columns_version", "2");
         }
     }
 }
