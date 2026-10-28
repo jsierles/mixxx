@@ -441,13 +441,25 @@ QString Sandbox::migrateOldSettings() {
     // The parent of the sandboxed path needs to be created before the legacySettingsPath
     // can be moved there. This is not necessary when running in a sandbox because macOS
     // automatically creates it.
-    QString sandboxedParentPath = homePath +
-            QLatin1String(
-                    "/Library/Containers/org.mixxx.mixxx/Data/Library/"
-                    "Application Support");
+    QString bundleIdentifier = QStringLiteral("org.mixxx.mixxx");
+    if (const auto bundle = CFBundleGetMainBundle()) {
+        if (const auto identifier = CFBundleGetIdentifier(bundle)) {
+            const auto value = CFStringToQString(identifier);
+            if (!value.isEmpty() && !value.contains('/')) {
+                bundleIdentifier = value;
+            }
+        }
+    }
+    QString sandboxedParentPath = homePath + QStringLiteral("/Library/Containers/") +
+            bundleIdentifier + QStringLiteral("/Data/Library/Application Support");
     QString sandboxedPath = sandboxedParentPath + QLatin1String("/Mixxx");
     QDir sandboxedDir(sandboxedPath);
 
+    // A separately identified preparation build owns a separate profile. Never
+    // migrate the user's ordinary Mixxx library into a companion application.
+    if (bundleIdentifier != QStringLiteral("org.mixxx.mixxx")) {
+        return sandboxedPath;
+    }
     QString legacySettingsPath = homePath + QLatin1String("/Library/Application Support/Mixxx");
     // The user has no settings from Mixxx < 2.3.0, so there is no migration to do.
     if (!QDir(legacySettingsPath).exists()) {
