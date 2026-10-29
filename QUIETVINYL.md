@@ -97,3 +97,8 @@ recordings, including an arrival while open and an exact duplicate, leaving two
 tracks and two playlist entries. The production profile was not modified.
 Remove the preparation Inbox helper/call to roll back native receiving; local
 profiles, shared canonical audio and cloud arrival receipts remain readable.
+
+Collective Mac preparation profiles may set `follow_system_output: true` in
+`quietvinyl-sync.json`. Their Main output follows the macOS default device,
+including changes while open. Preview joins Main when no separate headphone
+output is configured. Ordinary Mixxx and Pi routing retain their existing setup.

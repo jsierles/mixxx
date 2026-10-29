@@ -4,6 +4,9 @@
 
 #include <QLibrary>
 #include <QThread>
+#include <QTimer>
+#include <QElapsedTimer>
+#include <memory>
 #include <QtGlobal>
 #include <cstring> // for memcpy and strcmp
 
@@ -22,6 +25,7 @@
 #include "util/sample.h"
 #include "util/versionstore.h"
 #include "vinylcontrol/defs_vinylcontrol.h"
+#include "preparationsystemaudio.h"
 
 #ifdef Q_OS_IOS
 #include "soundio/soundmanagerios.h"
@@ -82,6 +86,36 @@ SoundManager::SoundManager(UserSettingsPointer pConfig,
     if (!m_config.readFromDisk()) {
         m_config.loadDefaults(this, SoundManagerConfig::ALL);
     }
+#ifdef Q_OS_MACOS
+    if (preparationFollowsSystemOutput(m_pConfig)) {
+        preparationSystemOutputConfig(this, &m_config);
+        auto lastOutput = std::make_shared<AudioDeviceID>(preparationSystemOutputId());
+        auto retryClock = std::make_shared<QElapsedTimer>();
+        retryClock->start();
+        auto* timer = new QTimer(this);
+        timer->setInterval(750);
+        connect(this, &SoundManager::devicesSetup, timer, [timer] {
+            if (!timer->isActive()) timer->start();
+        });
+        connect(timer, &QTimer::timeout, this, [this, lastOutput, retryClock] {
+            if (!preparationFollowsSystemOutput(m_pConfig)) return;
+            const auto current = preparationSystemOutputId();
+            if (current == kAudioObjectUnknown || current == *lastOutput) return;
+            if (retryClock->elapsed() < 2000) return;
+            retryClock->restart();
+            // Sound devices are recreated only when macOS changes its default.
+            // The preparation profile opts in; ordinary DJ/Pi routing is untouched.
+            clearAndQueryDevices();
+            auto next = getConfig();
+            if (preparationSystemOutputConfig(this, &next) && setConfig(next) == SoundDeviceStatus::Ok) {
+                *lastOutput = current;
+                qInfo() << "Preparation audio follows the macOS default output";
+            } else {
+                qWarning() << "Waiting for the macOS preparation output to become available";
+            }
+        });
+    }
+#endif
     checkConfig();
     // Don't write config to disk, yet -- it may be reset to defaults in case
     // previously configured devices were not found.

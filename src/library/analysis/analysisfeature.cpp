@@ -361,6 +361,13 @@ void AnalysisFeature::refreshPreparation() {
     if (m_preparationEnabled->get() <= 0) {
         return;
     }
+    // Preparation auditions use the ordinary output when no separate monitor
+    // is configured. A dedicated headphone output retains standard PFL routing.
+    ControlProxy headphones(ConfigKey("[Master]", "headEnabled"));
+    ControlProxy previewMain(ConfigKey("[PreviewDeck1]", "main_mix"));
+    ControlProxy previewPfl(ConfigKey("[PreviewDeck1]", "pfl"));
+    previewMain.set(headphones.get() <= 0 ? 1 : 0);
+    previewPfl.set(headphones.get() > 0 ? 1 : 0);
     startPreparationSync();
     receivePreparationInbox(m_pLibrary, m_pConfig);
     const auto track = PlayerInfo::instance().getTrackInfo("[Channel1]");
