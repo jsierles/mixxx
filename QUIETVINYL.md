@@ -77,3 +77,23 @@ It starts with 48-pixel rows; ordinary saved header state and Library row-height
 preferences retain later user adjustments. The preset does not change playlist
 ordering or audio metadata. Cover art fits inside the cell with its full aspect
 ratio, centered and uncropped even when the row is shorter than the column.
+
+## Collective Inbox arrivals
+
+When preparation is enabled and the current profile opts into
+`inbox_receive_enabled`, Mixxx processes verified local `Inbox/requests` files
+on its main thread. It resolves canonical recordings through the normal track
+collection manager, preserves embedded tags and existing preparation, and adds
+each recording once to `Inbox / New arrivals`. A durable local acknowledgement
+lets the companion distinguish a queued arrival from a completed native import.
+The native bridge accepts only bounded requests for this profile's registered
+collective and canonical hashed Music paths with matching catalogue/size.
+The companion verifies audio SHA-256 before queueing. It never writes the active
+Mixxx SQLite database externally.
+
+Verification: the companion's 12 Inbox tests and all 40 existing setup/sync tests
+pass. A separate sandboxed native profile accepted three requests for two
+recordings, including an arrival while open and an exact duplicate, leaving two
+tracks and two playlist entries. The production profile was not modified.
+Remove the preparation Inbox helper/call to roll back native receiving; local
+profiles, shared canonical audio and cloud arrival receipts remain readable.

@@ -32,6 +32,7 @@
 #include "sources/soundsourceproxy.h"
 #include "util/logger.h"
 #include "widget/wlibrary.h"
+#include "preparationinbox.h"
 
 namespace {
 
@@ -361,6 +362,7 @@ void AnalysisFeature::refreshPreparation() {
         return;
     }
     startPreparationSync();
+    receivePreparationInbox(m_pLibrary, m_pConfig);
     const auto track = PlayerInfo::instance().getTrackInfo("[Channel1]");
     auto cue = track ? track->findCueByType(mixxx::CueType::Downbeat) : CuePointer();
     if (cue && track->getBeats()) {
