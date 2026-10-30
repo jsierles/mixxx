@@ -19,6 +19,13 @@ class DeckIndicator : public QPushButton {
     explicit DeckIndicator(int deck, QWidget* parent);
     void setDeck(int deck);
     void positionAtTopRight();
+    void setHoldAction(std::function<void()> action);
+    bool holdTriggered() const { return m_holdTriggered; }
+  protected:
+    bool event(QEvent* event) override;
+  private:
+    QTimer m_hold;
+    bool m_holdTriggered = false;
 };
 
 // Visible navigation and a gesture surface share the same guarded browser actions.

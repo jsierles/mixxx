@@ -45,6 +45,27 @@ void DeckIndicator::positionAtTopRight() {
     raise();
 }
 
+void DeckIndicator::setHoldAction(std::function<void()> action) {
+    m_hold.setSingleShot(true);
+    m_hold.setInterval(2000);
+    connect(this, &QPushButton::pressed, this, [this] {
+        m_holdTriggered = false;
+        m_hold.start();
+    });
+    connect(this, &QPushButton::released, &m_hold, &QTimer::stop);
+    connect(&m_hold, &QTimer::timeout, this, [this, action] {
+        if (!isDown()) return;
+        m_holdTriggered = true;
+        action();
+    });
+}
+
+bool DeckIndicator::event(QEvent* event) {
+    if (event->type() == QEvent::Hide || event->type() == QEvent::TouchCancel ||
+            event->type() == QEvent::WindowDeactivate) m_hold.stop();
+    return QPushButton::event(event);
+}
+
 BrowserHeader::BrowserHeader(Action back, Action close, Action switchView, QWidget* parent)
         : QLabel(parent), m_back(std::move(back)), m_close(std::move(close)),
           m_switchView(std::move(switchView)) {

@@ -1,6 +1,8 @@
 #include "mixxxmainwindow.h"
 #include "widget/quietvinyldeckscreens.h"
+#include "widget/quietvinylrecovery.h"
 #include "widget/wsimplelibrary.h"
+#include <QProcess>
 #include <QScreen>
 
 #include <QCheckBox>
@@ -347,6 +349,29 @@ void MixxxMainWindow::initialize() {
             qInfo() << "QuietVinyl reconnect requested while audio disconnected";
             QCoreApplication::exit(75); // Normal destructor/settings shutdown.
         }, Qt::QueuedConnection);
+    }
+
+    if (qEnvironmentVariableIntValue("QUIETVINYL_RECOVERY_ENABLED") == 1 &&
+            !ControlObject::exists(ConfigKey("[QuietVinyl]", "recovery_open"))) {
+        const QString opener = QCoreApplication::applicationDirPath() + "/../recovery-open.sh";
+        auto* available = new ControlObject(ConfigKey("[QuietVinyl]", "recovery_available"));
+        available->setParent(this);
+        available->set(QFileInfo::exists(opener) ? 1 : 0);
+        auto* open = new ControlObject(ConfigKey("[QuietVinyl]", "recovery_open"));
+        open->setParent(this);
+        connect(open, &ControlObject::valueChanged, this, [opener, available](double value) {
+            if (value > 0 && available->get() > 0) QProcess::startDetached(opener, {});
+        }, Qt::QueuedConnection);
+        new QuietVinylRecoveryBridge(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/quietvinyl-recovery.sock",
+                [](const QString& group, const QString& item) {
+                    const ConfigKey key(group, item);
+                    return ControlObject::exists(key) ? ControlObject::get(key) : 0;
+                }, [this] {
+                    // The independent panel already required a deliberate hold.
+                    // Save deck identities and use ordinary destructor/settings shutdown.
+                    saveQuietVinylDeckTracks();
+                    QCoreApplication::exit(0);
+                }, this);
     }
 
     // Connect signals to the menubar. Should be done before emit skinLoaded.

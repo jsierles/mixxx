@@ -76,7 +76,12 @@ TouchDeckPanel::TouchDeckPanel(int deck, QWidget* waveform, Read read,
     m_deckIndicator = new DeckIndicator(deck, this);
     m_deckIndicator->setAttribute(Qt::WA_TransparentForMouseEvents, false);
     m_deckIndicator->setAccessibleName(tr("Show deck %1").arg(deck == 1 ? 2 : 1));
+    m_deckIndicator->setToolTip(tr("Tap to select deck; hold two seconds for Recovery"));
+    m_deckIndicator->setHoldAction([this] {
+        if (m_read("[QuietVinyl]", "recovery_available") > 0) pulse("[QuietVinyl]", "recovery_open");
+    });
     connect(m_deckIndicator, &QPushButton::clicked, this, [this] {
+        if (m_deckIndicator->holdTriggered()) return;
         const bool fixed = property("quietvinylFixedDeck").toBool();
         if (fixed && m_read("[Skin]", "show_maximized_library") > 0) {
             pulse("[Library]", "BrowseClose");

@@ -63,6 +63,12 @@ containing spaces.
 
 ## Touch browser navigation
 
+On the Pi, a two-second hold on a playback deck number opens the companion's
+independent Recovery window through its separately supervised launcher. The
+owner-only recovery socket reports DVS controls and permits a normal saved-state
+exit after the recovery window's deliberate restart hold. It exposes no TCP
+listener. The companion owns diagnostics, process supervision and desktop access.
+
 The browser header includes 56-pixel-high Back and Close buttons. They use the
 same actions as header swipes: Back returns one level and closes at Music;
 Close returns to playback. The buttons move with the browser between fixed
