@@ -100,7 +100,10 @@ TouchDeckPanel::TouchDeckPanel(int deck, QWidget* waveform, Read read,
     m_viewToggle->setAccessibleName(toggleName);
     m_viewToggle->setToolTip(toggleName);
     connect(m_viewToggle, &QPushButton::clicked, this, [this] {
-        m_write("[QuietVinyl]", "minimal_mode", m_minimal ? 0 : 1);
+        if (property("quietvinylFixedDeck").toBool())
+            m_write("[QuietVinyl]", setting("view_mode"), m_minimal ? 1 : 2);
+        else
+            m_write("[QuietVinyl]", "minimal_mode", m_minimal ? 0 : 1);
     });
     m_dvsMode = new QPushButton(this);
     m_dvsMode->setObjectName("TouchDvsMode");

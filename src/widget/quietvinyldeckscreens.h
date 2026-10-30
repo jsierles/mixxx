@@ -64,9 +64,14 @@ class QuietVinylDeckScreens : public QWidget {
     }
 
     void refresh() {
-        const int view = m_read("[QuietVinyl]", "minimal_mode") > 0 ? 1 : 0;
-        for (auto* playback : m_playback) playback->setCurrentIndex(view);
-        if (view != m_view) { m_view = view; invalidateDisplay(); }
+        const int sharedView = m_read("[QuietVinyl]", "minimal_mode") > 0 ? 1 : 0;
+        for (int deck = 0; deck < 2; ++deck) {
+            const double choice = m_read("[QuietVinyl]",
+                    QStringLiteral("deck%1_view_mode").arg(deck + 1));
+            const int view = choice == 1 ? 0 : choice == 2 ? 1 : sharedView;
+            m_playback[deck]->setCurrentIndex(view);
+            if (view != m_view[deck]) { m_view[deck] = view; invalidateDisplay(deck); }
+        }
         const bool browsing = m_read("[Skin]", "show_maximized_library") > 0;
         const int target = m_read("[QuietVinyl]", "deck_page") > 0 ? 1 : 0;
         const int destination = browsing ? target : -1;
@@ -128,10 +133,12 @@ class QuietVinylDeckScreens : public QWidget {
     std::array<QStackedWidget*, 2> m_playback;
     QTimer m_timer;
     int m_browserDeck = -1;
-    int m_view = -1;
+    std::array<int, 2> m_view{{-1, -1}};
     quint64 m_displayEpoch = 0;
-    void invalidateDisplay() {
-        for (auto* host : m_hosts)
-            host->setProperty("quietvinylDisplayEpoch", QString::number(++m_displayEpoch));
+    void invalidateDisplay(int deck = -1) {
+        for (int i = 0; i < 2; ++i) {
+            if (deck < 0 || deck == i)
+                m_hosts[i]->setProperty("quietvinylDisplayEpoch", QString::number(++m_displayEpoch));
+        }
     }
 };
