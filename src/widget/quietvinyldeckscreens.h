@@ -10,6 +10,7 @@
 #include <QWindow>
 #include <array>
 #include <functional>
+#include "widget/quietvinyldisplaybridge.h"
 
 // Two presentations of the same engine. The single shared browser moves only
 // when its explicit destination changes; the other deck keeps displaying audio.
@@ -18,7 +19,8 @@ class QuietVinylDeckScreens : public QWidget {
     using Read = std::function<double(const QString&, const QString&)>;
     using Pages = std::array<std::array<QWidget*, 2>, 2>; // deck, full/minimal
     QuietVinylDeckScreens(QWidget* skin, const Pages& pages, QWidget* browser,
-            Read read, QWidget* parent = nullptr)
+            Read read, QWidget* parent = nullptr,
+            QuietVinylDisplayBridge::NativeImage nativeImage = {})
             : QWidget(parent), m_browser(browser), m_read(std::move(read)) {
         setObjectName("QuietVinylRoot");
         setProperty("quietvinylDualPresentation", true);
@@ -34,6 +36,7 @@ class QuietVinylDeckScreens : public QWidget {
         secondLayout->setContentsMargins(0, 0, 0, 0);
         for (int deck = 0; deck < 2; ++deck) {
             m_hosts[deck] = new QStackedWidget;
+            m_hosts[deck]->setObjectName(QStringLiteral("QuietVinylDeckSurface%1").arg(deck + 1));
             m_playback[deck] = new QStackedWidget;
             m_hosts[deck]->addWidget(m_playback[deck]);
             for (auto* page : pages[deck]) {
@@ -53,11 +56,17 @@ class QuietVinylDeckScreens : public QWidget {
         connect(&m_timer, &QTimer::timeout, this, [this] { refresh(); });
         m_timer.start();
         refresh();
+        const auto displaySocket = qEnvironmentVariable("QUIETVINYL_DENON_SOCKET");
+        if (!displaySocket.isEmpty()) {
+            new QuietVinylDisplayBridge(displaySocket, {m_hosts[0], m_hosts[1]},
+                    std::move(nativeImage), this);
+        }
     }
 
     void refresh() {
         const int view = m_read("[QuietVinyl]", "minimal_mode") > 0 ? 1 : 0;
         for (auto* playback : m_playback) playback->setCurrentIndex(view);
+        if (view != m_view) { m_view = view; invalidateDisplay(); }
         const bool browsing = m_read("[Skin]", "show_maximized_library") > 0;
         const int target = m_read("[QuietVinyl]", "deck_page") > 0 ? 1 : 0;
         const int destination = browsing ? target : -1;
@@ -74,6 +83,7 @@ class QuietVinylDeckScreens : public QWidget {
             m_browser->setParent(this);
             m_browser->hide();
         }
+        invalidateDisplay();
     }
 
     QWidget* secondaryWindow() const { return m_secondWindow; }
@@ -118,4 +128,10 @@ class QuietVinylDeckScreens : public QWidget {
     std::array<QStackedWidget*, 2> m_playback;
     QTimer m_timer;
     int m_browserDeck = -1;
+    int m_view = -1;
+    quint64 m_displayEpoch = 0;
+    void invalidateDisplay() {
+        for (auto* host : m_hosts)
+            host->setProperty("quietvinylDisplayEpoch", QString::number(++m_displayEpoch));
+    }
 };

@@ -16,6 +16,24 @@ Those resources are needed for a complete QuietVinyl installation; this fork
 alone builds Mixxx with the optional interface code. Runtime profiles, media,
 credentials, downloaded dependencies and compiled applications are not sources.
 
+## Opt-in SC6000 deck display bridge
+
+With the existing dual-screen presentation active, `QUIETVINYL_DENON_SOCKET`
+opts into an owner-only local frame/touch socket. Without that environment
+variable no display listener starts. Each client binds one deck, receives the
+existing native UI as letterboxed 1280×800 RGB, and sends ordered gestures
+through its original widgets. Native GL framebuffers are composed in stacking
+order with the ordinary controls. Stale view/geometry/sequence, duplicate deck
+owners and modal/popup activity are refused; disconnects cancel held gestures.
+
+The companion project's `denon/` worker owns USB, zlib compression, changed
+rectangles, serial assignments and reconnects outside the audio engine. This
+initial implementation mirrors the existing HDMI-backed deck windows. It does
+not implement display presentation without backing screens or change audio,
+DVS, MIDI mappings or device firmware. The companion's dedicated native tests
+and full-app generated-audio smoke cover frame layout, control routing, Browse,
+GL pixels and the worker path; Pi hardware acceptance is a separate trial.
+
 ## Maintenance
 
 Make source changes here as normal Git commits. The companion build pins a full

@@ -1,5 +1,7 @@
 #include "mixxxmainwindow.h"
 #include "widget/quietvinyldeckscreens.h"
+#include "widget/wglwidget.h"
+#include <QOpenGLWindow>
 #include "widget/quietvinylrecovery.h"
 #include "widget/wsimplelibrary.h"
 #include <QProcess>
@@ -1429,7 +1431,12 @@ bool MixxxMainWindow::loadConfiguredSkin() {
                     [](const QString& group, const QString& item) {
                         const ConfigKey key(group, item);
                         return ControlObject::exists(key) ? ControlObject::get(key) : 0.0;
-                    }, this);
+                    }, this, [](QWidget* widget) {
+                        if (auto* gl = dynamic_cast<WGLWidget*>(widget)) {
+                            if (auto* window = gl->getOpenGLWindow()) return window->grabFramebuffer();
+                        }
+                        return QImage();
+                    });
             presentation->secondaryWindow()->installEventFilter(
                     m_pCoreServices->getKeyboardEventFilter().get());
             // Keep menu shortcuts usable while deck 2 owns keyboard focus.
