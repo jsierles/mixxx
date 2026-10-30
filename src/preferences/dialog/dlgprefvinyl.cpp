@@ -4,6 +4,7 @@
 
 #include "control/controlobject.h"
 #include "control/controlproxy.h"
+#include "control/controlobject.h"
 #include "control/pollingcontrolproxy.h"
 #include "defs_urls.h"
 #include "mixer/playermanager.h"
@@ -69,6 +70,7 @@ DlgPrefVinyl::DlgPrefVinyl(
     for (auto* box : std::as_const(m_vcPitchEstimatorBoxes)) {
         box->addItem(MIXXX_VINYL_PITCH_FILTER_KALMAN);
         box->addItem(MIXXX_VINYL_PITCH_FILTER_LEGACY);
+        box->addItem(MIXXX_VINYL_PITCH_FILTER_UPSTREAM);
     }
 
     m_vcLeadInBoxes = {LeadinTime1, LeadinTime2, LeadinTime3, LeadinTime4};
@@ -264,9 +266,14 @@ int DlgPrefVinyl::getDefaultLeadIn(const QString& vinyl_type) const {
 void DlgPrefVinyl::slotApply() {
     slotVinylGainApply();
 
-    // Save vinyl types, speed and lead-in, activate signal wdgets
+    bool reload = false;
+
+    // Save vinyl types, speed and lead-in, activate signal widgets
     for (int i = 0; i < kMaximumVinylControlInputs; ++i) {
         QString group = PlayerManager::groupForDeck(i);
+        const QString oldType = config->getValueString(ConfigKey(group, "vinylcontrol_vinyl_type"));
+        const QString oldSpeed = config->getValueString(ConfigKey(group, "vinylcontrol_speed_type"));
+        const QString oldLeadIn = config->getValueString(ConfigKey(group, "vinylcontrol_lead_in_time"));
 
         config->set(ConfigKey(group, "vinylcontrol_vinyl_type"),
                 ConfigValue(m_vcTypeBoxes[i]->currentText()));
@@ -275,6 +282,17 @@ void DlgPrefVinyl::slotApply() {
         config->set(ConfigKey(group, "vinylcontrol_pitch_estimator_type"),
                 ConfigValue(m_vcPitchEstimatorBoxes[i]->currentText()));
         verifyAndSaveLeadInTime(i, group);
+        reload |= m_pVCManager->vinylInputConnected(i) &&
+                (oldType != m_vcTypeBoxes[i]->currentText() ||
+                        oldSpeed != m_vcSpeedBoxes[i]->currentText() ||
+                        oldLeadIn != config->getValueString(ConfigKey(group, "vinylcontrol_lead_in_time")));
+        const QString estimator = m_vcPitchEstimatorBoxes[i]->currentText();
+        const ConfigKey selection(group, "vinylcontrol_pitch_algorithm");
+        if (ControlObject::exists(selection)) {
+            ControlObject::set(selection, estimator == MIXXX_VINYL_PITCH_FILTER_LEGACY ? 0
+                    : estimator == MIXXX_VINYL_PITCH_FILTER_UPSTREAM ? 2 : 1);
+        }
+
 
         m_signalWidgets[i]->setVinylActive(m_pVCManager->vinylInputConnected(i));
     }
@@ -292,7 +310,7 @@ void DlgPrefVinyl::slotApply() {
     config->set(ConfigKey(VINYL_PREF_KEY,"show_signal_quality"),
                 ConfigValue((int)(SignalQualityEnable->isChecked())));
 
-    m_pVCManager->requestReloadConfig();
+    if (reload) m_pVCManager->requestReloadConfig();
     slotUpdate();
 }
 

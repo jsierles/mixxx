@@ -118,6 +118,18 @@ TouchDeckPanel::TouchDeckPanel(int deck, QWidget* waveform, Read read,
         }
         refresh();
     });
+    m_pitchAlgorithm = new QPushButton(this);
+    m_pitchAlgorithm->setObjectName("TouchPitchAlgorithm");
+    m_pitchAlgorithm->setFixedSize(116, 64);
+    m_pitchAlgorithm->setFocusPolicy(Qt::NoFocus);
+    m_pitchAlgorithm->setStyleSheet("font-size:16px; padding:0 4px;");
+    connect(m_pitchAlgorithm, &QPushButton::clicked, this, [this] {
+        const int count = static_cast<int>(m_read(m_group, "vinylcontrol_pitch_algorithm_count"));
+        if (count < 2 || count > 3) return;
+        const int current = static_cast<int>(m_read(m_group, "vinylcontrol_pitch_algorithm"));
+        m_write(m_group, "vinylcontrol_pitch_algorithm", (current + 1) % count);
+        refresh();
+    });
     m_keylock = new QPushButton(QStringLiteral("♪"), this);
     m_keylock->setObjectName("TouchKeylock");
     m_keylock->setFixedSize(64, 64);
@@ -238,7 +250,7 @@ TouchDeckPanel::TouchDeckPanel(int deck, QWidget* waveform, Read read,
         metadata->addWidget(label);
     }
     header->addLayout(metadata, 1);
-    header->addSpacing(300);
+    header->addSpacing(428);
     auto button = [this](const QString& text, const QString& name,
                           const QString& accessible) {
         auto* b = new QPushButton(text, this);
@@ -442,6 +454,16 @@ void TouchDeckPanel::refresh() {
                         : tr("Relative mode: stop the record and exit the loop to select Absolute");
     m_dvsMode->setAccessibleName(modeHelp);
     m_dvsMode->setToolTip(modeHelp);
+    const int algorithmCount = static_cast<int>(m_read(m_group, "vinylcontrol_pitch_algorithm_count"));
+    const int algorithm = static_cast<int>(m_read(m_group, "vinylcontrol_pitch_algorithm"));
+    const QStringList names{tr("Alpha–Beta"), tr("Kalman"), tr("New Kalman")};
+    m_pitchAlgorithm->setEnabled(algorithmCount >= 2 && algorithmCount <= 3);
+    m_pitchAlgorithm->setText(algorithmCount >= 2 && algorithm >= 0 && algorithm < 3
+                    ? names[algorithm] : tr("Pitch"));
+    const QString pitchHelp = algorithmCount < 2 ? tr("Connect timecode input to select a pitch algorithm")
+            : tr("Pitch algorithm: %1. Tap to cycle. New Kalman is experimental.").arg(names.value(algorithm));
+    m_pitchAlgorithm->setAccessibleName(pitchHelp);
+    m_pitchAlgorithm->setToolTip(pitchHelp);
     const bool keylock = m_read(m_group, "keylock") > 0;
     m_keylock->setChecked(keylock);
     const QString keylockHelp = keylock ? tr("Keylock on: tap to turn off")
@@ -644,6 +666,9 @@ void TouchDeckPanel::positionViewControls() {
     m_keylock->move(nextX - m_keylock->width(), 12);
     m_keylock->raise();
     nextX = m_keylock->x() - 12;
+    m_pitchAlgorithm->move(nextX - m_pitchAlgorithm->width(), 12);
+    m_pitchAlgorithm->raise();
+    nextX = m_pitchAlgorithm->x() - 12;
     m_viewToggle->move(nextX - m_viewToggle->width(), 12);
     m_viewToggle->show();
     m_viewToggle->raise();

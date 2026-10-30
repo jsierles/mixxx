@@ -7,6 +7,7 @@
 #include "audio/types.h"
 #include "control/controlobject.h"
 #include "control/controlproxy.h"
+#include "control/controlpushbutton.h"
 #include "moc_vinylcontrolxwax.cpp"
 #include "util/defs.h"
 #include "util/math.h"
@@ -26,15 +27,6 @@
 namespace {
 constexpr int kChannels = 2;
 
-timecode_def* findTimecodeDefinition(const char* name) {
-#if QUIETVINYL_UPSTREAM_PITCH
-    // Existing formats need no disk-backed MK2 lookup table. The experimental
-    // detector does not add new formats to QuietVinyl's preferences.
-    return timecoder_find_definition(name, nullptr);
-#else
-    return timecoder_find_definition(name);
-#endif
-}
 } // namespace
 
 // Sample threshold below which we consider there to be no signal.
@@ -132,12 +124,12 @@ VinylControlXwax::VinylControlXwax(UserSettingsPointer pConfig, const QString& g
         m_pSteadyGross = new SteadyPitch(0.5, false);
     }
 
-    timecode_def* tc_def = findTimecodeDefinition(timecode);
+    timecode_def* tc_def = timecoder_find_definition(timecode);
     if (tc_def == nullptr) {
         qDebug() << "Error finding timecode definition for " << timecode
                  << ", defaulting to" << MIXXX_VINYL_DEFAULT_XWAX_NAME;
         timecode = MIXXX_VINYL_DEFAULT_XWAX_NAME;
-        tc_def = findTimecodeDefinition(timecode);
+        tc_def = timecoder_find_definition(timecode);
     }
 
     double speed = 1.0;
@@ -177,6 +169,7 @@ VinylControlXwax::VinylControlXwax(UserSettingsPointer pConfig, const QString& g
             sampleRate,
             /* phono */ false,
             use_legacy_pitch_filter);
+    m_upstreamPitch = qv_pitch_create(timecode, speed, sampleRate);
     timecoder_monitor_init(&timecoder, MIXXX_VINYL_SCOPE_SIZE);
     //Note that timecoder_init will not double-malloc the LUTs, and after this we are guaranteed
     //that the LUT has been generated unless we ran out of memory.
@@ -184,6 +177,36 @@ VinylControlXwax::VinylControlXwax(UserSettingsPointer pConfig, const QString& g
     m_uiSafeZone = timecoder_get_safe(&timecoder);
     //}
     s_xwaxLUTMutex.unlock();
+
+    int initial = strPitchEstimator == MIXXX_VINYL_PITCH_FILTER_LEGACY ? 0
+            : strPitchEstimator == MIXXX_VINYL_PITCH_FILTER_UPSTREAM ? 2 : 1;
+#if QUIETVINYL_UPSTREAM_PITCH
+    if (strPitchEstimator.isEmpty()) initial = 2;
+#endif
+    if (initial == 2 && !m_upstreamPitch) initial = 1;
+    m_pitchSwitch.reset(initial);
+    m_pitchAlgorithm = std::make_unique<ControlPushButton>(
+            ConfigKey(group, "vinylcontrol_pitch_algorithm"));
+    m_pitchAlgorithm->setStates(3);
+    m_pitchAlgorithm->setButtonMode(ControlPushButton::TOGGLE);
+    m_pitchAlgorithm->set(initial);
+    auto readOnly = [&](const char* key, double value) {
+        auto control = std::make_unique<ControlObject>(ConfigKey(group, key));
+        control->setAndConfirm(value);
+        control->setReadOnly();
+        return control;
+    };
+    m_pitchAlgorithmActive = readOnly("vinylcontrol_pitch_algorithm_active", initial);
+    m_pitchAlgorithmSwitching = readOnly("vinylcontrol_pitch_algorithm_switching", 0);
+    m_pitchAlgorithmCount = readOnly("vinylcontrol_pitch_algorithm_count", m_upstreamPitch ? 3 : 2);
+    connect(m_pitchAlgorithm.get(), &ControlObject::valueChanged, this,
+            [this](double value) {
+                if (!PitchAlgorithmSwitch::valid(value) || (value == 2 && !m_upstreamPitch)) return;
+                const char* names[] = {MIXXX_VINYL_PITCH_FILTER_LEGACY,
+                        MIXXX_VINYL_PITCH_FILTER_KALMAN, MIXXX_VINYL_PITCH_FILTER_UPSTREAM};
+                m_pConfig->set(ConfigKey(m_group, "vinylcontrol_pitch_estimator_type"),
+                        ConfigValue(names[static_cast<int>(value)]));
+            }, Qt::DirectConnection);
 
     qDebug() << "Starting vinyl control xwax thread";
 }
@@ -195,10 +218,10 @@ VinylControlXwax::~VinylControlXwax() {
     // Cleanup xwax nicely
     timecoder_monitor_clear(&timecoder);
     timecoder_clear(&timecoder);
+    qv_pitch_destroy(m_upstreamPitch);
 
-    // TODO(rryan): This looks wrong. freeLUTs is called later by
-    // VinylControlProcessor so we are probably leaking the LUTs.
-    s_bLUTInitialized = false;
+    // Both libraries' shared LUTs outlive individual decks. The processor frees
+    // them after every decoder has stopped.
 
     m_pVCRate->set(0.0);
 }
@@ -208,6 +231,7 @@ void VinylControlXwax::freeLUTs() {
     s_xwaxLUTMutex.lock(); //Static mutex! We don't want two threads doing this!
     if (s_bLUTInitialized) {
         timecoder_free_lookup(); //Frees all the LUTs in xwax.
+        qv_pitch_free_lookups();
         s_bLUTInitialized = false;
     }
     s_xwaxLUTMutex.unlock();
@@ -259,6 +283,7 @@ void VinylControlXwax::analyzeSamples(CSAMPLE* pSamples, size_t nFrames) {
     // Submit the samples to the xwax timecode processor. The size argument is
     // in stereo frames.
     timecoder_submit(&timecoder, m_pWorkBuffer.data(), nFrames);
+    qv_pitch_submit(m_upstreamPitch, m_pWorkBuffer.data(), nFrames);
 
     bool bHaveSignal = fabs(pSamples[0]) + fabs(pSamples[1]) > kMinSignal;
     //qDebug() << "signal?" << bHaveSignal;
@@ -270,7 +295,18 @@ void VinylControlXwax::analyzeSamples(CSAMPLE* pSamples, size_t nFrames) {
     // Check if vinyl control is enabled...
     m_bIsEnabled = enabled && checkEnabled(m_bIsEnabled, enabled->toBool());
 
-    double dVinylPitch = timecoder_get_pitch(&timecoder);
+    double requested = m_pitchAlgorithm->get();
+    if (!PitchAlgorithmSwitch::valid(requested) || (requested == 2 && !m_upstreamPitch)) {
+        requested = m_pitchSwitch.target();
+        m_pitchAlgorithm->set(requested);
+    }
+    m_pitchSwitch.request(static_cast<int>(requested));
+    const std::array<double, 3> rates{{pitch_current(&timecoder.pitch) / timecoder.speed,
+            pitch_kalman_current(&timecoder.pitch_kalman) / timecoder.speed,
+            qv_pitch_rate(m_upstreamPitch)}};
+    double dVinylPitch = m_pitchSwitch.process(rates, nFrames * timecoder.dt);
+    m_pitchAlgorithmActive->setAndConfirm(m_pitchSwitch.active());
+    m_pitchAlgorithmSwitching->setAndConfirm(m_pitchSwitch.switching() ? 1 : 0);
     double positionAge = 1;
     const int decodedPosition = timecoder_get_position(&timecoder, &positionAge);
 

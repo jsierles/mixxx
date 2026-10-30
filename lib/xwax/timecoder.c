@@ -298,6 +298,8 @@ static void init_channel(struct timecoder_channel *ch)
 {
     ch->positive = false;
     ch->zero = 0;
+    ch->swapped = false;
+    ch->crossing_ticker = 0;
 }
 
 /*
@@ -336,9 +338,8 @@ void timecoder_init(struct timecoder *tc, struct timecode_def *def,
     tc->last_quadrant = 0;
     tc->direction_changed = false;
 
-    if (tc->use_legacy_pitch_filter) {
-        pitch_init(&tc->pitch, tc->dt);
-    } else {
+    pitch_init(&tc->pitch, tc->dt);
+    {
         pitch_kalman_init(&tc->pitch_kalman,
                           tc->dt,
                           KALMAN_COEFFS(1e-8, 10.0), /* stable mode */
@@ -611,10 +612,8 @@ static void process_sample(struct timecoder *tc,
      */
 
     if (!tc->primary.swapped && !tc->secondary.swapped) {
-        if (tc->use_legacy_pitch_filter)
-            pitch_dt_observation(&tc->pitch, 0.0);
-        else
-            pitch_kalman_update(&tc->pitch_kalman, 0.0);
+        pitch_dt_observation(&tc->pitch, 0.0);
+        pitch_kalman_update(&tc->pitch_kalman, 0.0);
     } else {
         double dx;
 
@@ -628,10 +627,8 @@ static void process_sample(struct timecoder *tc,
         if (!tc->forwards)
             dx = -dx;
 
-        if (tc->use_legacy_pitch_filter)
-            pitch_dt_observation(&tc->pitch, dx);
-        else
-            pitch_kalman_update(&tc->pitch_kalman, dx);
+        pitch_dt_observation(&tc->pitch, dx);
+        pitch_kalman_update(&tc->pitch_kalman, dx);
     }
 
     /* If we have crossed the primary channel in the right polarity,

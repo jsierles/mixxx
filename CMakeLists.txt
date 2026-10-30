@@ -3944,34 +3944,28 @@ if(VINYLCONTROL)
   )
   target_compile_definitions(mixxx-lib PUBLIC __VINYLCONTROL__)
 
-  # Internal xwax library
-  option(QUIETVINYL_UPSTREAM_PITCH "Use the experimental upstream per-sample pitch detector" OFF)
+  # Keep the original decoder as the position authority and run all pitch
+  # estimators continuously. Prefix the upstream C symbols so both libraries
+  # can coexist without sharing LUTs or filter state.
+  option(QUIETVINYL_UPSTREAM_PITCH "Default to new Kalman for profiles without an estimator preference" OFF)
   configure_file(src/vinylcontrol/quietvinylpitchconfig.h.in src/quietvinylpitchconfig.h)
-  if(QUIETVINYL_UPSTREAM_PITCH)
-    set(QUIETVINYL_XWAX_DIR lib/xwax/upstream)
-  else()
-    set(QUIETVINYL_XWAX_DIR lib/xwax)
-  endif()
-  add_library(mixxx-xwax STATIC EXCLUDE_FROM_ALL)
-  target_sources(
-    mixxx-xwax
-    PRIVATE
-      ${QUIETVINYL_XWAX_DIR}/timecoder.c
-      ${QUIETVINYL_XWAX_DIR}/lut.c
-      ${QUIETVINYL_XWAX_DIR}/pitch_kalman.c
-  )
-  if(QUIETVINYL_UPSTREAM_PITCH)
-    target_include_directories(mixxx-xwax BEFORE PRIVATE ${QUIETVINYL_XWAX_DIR})
-    target_sources(mixxx-xwax PRIVATE
-      ${QUIETVINYL_XWAX_DIR}/timecoder_mk2.c
-      ${QUIETVINYL_XWAX_DIR}/lut_mk2.c
-      ${QUIETVINYL_XWAX_DIR}/filters.c
-      ${QUIETVINYL_XWAX_DIR}/ringbuffer.c
-      ${QUIETVINYL_XWAX_DIR}/fmatrix.c
-    )
-  endif()
+  add_library(mixxx-xwax STATIC EXCLUDE_FROM_ALL
+    lib/xwax/timecoder.c lib/xwax/lut.c lib/xwax/pitch_kalman.c)
   target_include_directories(mixxx-xwax SYSTEM PUBLIC lib/xwax)
-  target_link_libraries(mixxx-lib PRIVATE mixxx-xwax)
+  add_library(mixxx-xwax-upstream STATIC EXCLUDE_FROM_ALL
+    lib/xwax/upstream/timecoder.c lib/xwax/upstream/timecoder_mk2.c
+    lib/xwax/upstream/lut.c lib/xwax/upstream/lut_mk2.c
+    lib/xwax/upstream/filters.c lib/xwax/upstream/ringbuffer.c
+    lib/xwax/upstream/pitch_kalman.c lib/xwax/upstream/fmatrix.c
+    src/vinylcontrol/upstreampitch.c)
+  target_include_directories(mixxx-xwax-upstream PRIVATE lib/xwax/upstream src/vinylcontrol)
+  foreach(symbol timecoder_find_definition timecoder_free_lookup timecoder_init
+      timecoder_clear timecoder_monitor_init timecoder_monitor_clear
+      timecoder_cycle_definition timecoder_submit timecoder_get_position
+      lut_init lut_clear lut_push lut_lookup pitch_kalman_init pitch_kalman_update)
+    target_compile_definitions(mixxx-xwax-upstream PRIVATE "${symbol}=qv_upstream_${symbol}")
+  endforeach()
+  target_link_libraries(mixxx-lib PRIVATE mixxx-xwax mixxx-xwax-upstream)
 endif()
 
 # WavPack audio file support

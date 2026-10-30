@@ -9,21 +9,13 @@
 #include "vinylcontrol/vinylbrowsesignalloss.h"
 #include "quietvinylpitchconfig.h"
 
-#ifdef _MSC_VER
-#if QUIETVINYL_UPSTREAM_PITCH
-#include "upstream/timecoder.h"
-#else
-#include "timecoder.h"
-#endif
-#else
 extern "C" {
-#if QUIETVINYL_UPSTREAM_PITCH
-#include "upstream/timecoder.h"
-#else
 #include "timecoder.h"
-#endif
+#include "vinylcontrol/upstreampitch.h"
 }
-#endif
+#include "vinylcontrol/pitchalgorithmswitch.h"
+
+class ControlPushButton;
 
 #define XWAX_DEVICE_FRAME 32
 #define XWAX_SMOOTHING (128 / XWAX_DEVICE_FRAME) /* result value is in frames */
@@ -64,6 +56,12 @@ class VinylControlXwax : public VinylControl {
     int getPositionQuality();
     int getPitchQuality(double& pitch);
 
+    std::unique_ptr<ControlPushButton> m_pitchAlgorithm;
+    std::unique_ptr<ControlObject> m_pitchAlgorithmActive;
+    std::unique_ptr<ControlObject> m_pitchAlgorithmSwitching;
+    std::unique_ptr<ControlObject> m_pitchAlgorithmCount;
+    QuietVinylUpstreamPitch* m_upstreamPitch = nullptr;
+    PitchAlgorithmSwitch m_pitchSwitch;
     NeedleDropDetector m_needleDrop;
     VinylBrowseSignalLoss m_browseSignalLoss;
     bool m_autoAbsoluteOnNeedleDrop = false;

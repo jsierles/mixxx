@@ -60,6 +60,7 @@ class TouchDeckPanel : public QWidget {
     QPushButton* m_viewToggle;
     QPushButton* m_dvsMode = nullptr;
     QPushButton* m_keylock;
+    QPushButton* m_pitchAlgorithm;
     QPushButton* m_browse;
     QPushButton* m_reconnect;
     QWidget* m_waveform = nullptr;

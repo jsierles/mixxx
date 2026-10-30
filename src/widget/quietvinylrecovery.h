@@ -42,7 +42,7 @@ class QuietVinylRecoveryBridge : public QObject {
                             QJsonObject state;
                             for (const char* key : {"vinylcontrol_enabled", "vinylcontrol_mode",
                                          "vinylbrowse_valid", "vinylbrowse_frame", "vinylbrowse_capture",
-                                         "vinylcontrol_rate", "play", "playposition"}) {
+                                         "vinylcontrol_rate", "vinylcontrol_pitch_algorithm", "vinylcontrol_pitch_algorithm_active", "vinylcontrol_pitch_algorithm_switching", "vinylcontrol_pitch_algorithm_count", "play", "playposition"}) {
                                 state.insert(key, m_read(QStringLiteral("[Channel%1]").arg(deck), key));
                             }
                             decks.append(state);

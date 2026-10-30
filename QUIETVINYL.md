@@ -43,10 +43,35 @@ GL pixels and the worker path; Pi hardware acceptance is a separate trial.
 
 ## Maintenance
 
-The experimental `QUIETVINYL_UPSTREAM_PITCH=ON` CMake option builds the
-per-sample pitch detector imported from upstream main commit
-`bc49961fd3e5a46cd46588090c652a0d7ec44e18`. It defaults to **OFF**, retaining
-the original 2.5.6 decoder for ordinary builds. The unchanged upstream C/header
+### Live per-deck pitch selection
+
+The current player runs original Alpha-Beta, original Kalman and upstream
+per-sample Kalman continuously. `[ChannelN],vinylcontrol_pitch_algorithm`
+selects 0, 1 or 2. A 50 ms blend of their current speed outputs handles selection
+and rapid retargeting; the original timecode decoder retains position authority.
+Selection never reloads the decoder or directly writes Play, mode, seek, loops
+or Browse capture. Read-only `_active`, `_switching` and `_count` controls report
+the handoff and available algorithms. The existing estimator preference string
+is updated in memory immediately and persists through the normal profile-save lifecycle.
+
+The touch header cycles the algorithms in both views. Native Vinyl Control
+preferences also apply an estimator-only change live; format/speed/lead-in
+changes retain their ordinary reload. The companion owns the Neon gesture and
+operator guide. Saved preferences take priority over the CMake default for
+unsaved profiles, so existing Kalman profiles retain original Kalman.
+
+The upstream library has separate C symbols and LUTs behind an opaque wrapper.
+Its imported source remains unchanged; both original filters share the existing
+quadrature measurements. All banks are allocated before sample processing.
+The upstream response limitations below remain relevant to the New Kalman
+choice; this feature adds switching rather than changing its tuning.
+
+The earlier `251c3fda46` comparison build used the
+`QUIETVINYL_UPSTREAM_PITCH=ON` CMake option to replace the decoder at build time.
+All three now coexist; that flag only selects the default for profiles without
+a saved estimator preference and still defaults to **OFF**. The per-sample
+detector is imported from upstream main commit
+`bc49961fd3e5a46cd46588090c652a0d7ec44e18`. The unchanged upstream C/header
 files and matrix/filter tests live under `lib/xwax/upstream`; `UPSTREAM.json`
 records their original paths, hashes and downloaded snapshot hash. The small
 lookup-API adapter preserves the existing formats and QuietVinyl DVS controls.
