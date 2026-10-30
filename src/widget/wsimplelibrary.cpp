@@ -315,8 +315,19 @@ void WSimpleLibrary::setTidalLibrary(TidalPlaylistLibrary* library) {
 void WSimpleLibrary::cancelVinyl() {
     if (m_capturedDeck) {
         qInfo() << "Vinyl browse hold ended on deck" << m_capturedDeck;
-        ControlObject::set(ConfigKey(QStringLiteral("[Channel%1]").arg(m_capturedDeck),
-                "vinylbrowse_capture"), 0.0);
+        const QString group = QStringLiteral("[Channel%1]").arg(m_capturedDeck);
+        // A moving record continues advancing while Browse holds the song at
+        // its captured rate. Returning that song to Absolute would force a
+        // correction/seek to the record, audible as a nudge on deck transfer.
+        // Resume ordinary rate control in Relative, as loops/cue jumps do.
+        // A completed load remains stopped and retains its Absolute handoff.
+        if (!m_loadingVinyl && ControlObject::get(ConfigKey(group, "vinylbrowse_capture")) >= 2 &&
+                ControlObject::toBool(ConfigKey(group, "play")) &&
+                ControlObject::toBool(ConfigKey(group, "vinylcontrol_enabled")) &&
+                ControlObject::get(ConfigKey(group, "vinylcontrol_mode")) == MIXXX_VCMODE_ABSOLUTE) {
+            ControlObject::set(ConfigKey(group, "vinylcontrol_mode"), MIXXX_VCMODE_RELATIVE);
+        }
+        ControlObject::set(ConfigKey(group, "vinylbrowse_capture"), 0.0);
     }
     m_capturedDeck = 0;
     m_loadingVinyl = false;

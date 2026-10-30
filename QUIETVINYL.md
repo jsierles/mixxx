@@ -69,6 +69,12 @@ owner-only recovery socket reports DVS controls and permits a normal saved-state
 exit after the recovery window's deliberate restart hold. It exposes no TCP
 listener. The companion owns diagnostics, process supervision and desktop access.
 
+Leaving Waveforms Browse or transferring it to the other deck releases a playing
+captured song into Relative DVS. This preserves transport continuity instead of
+forcing an Absolute resync to a record that kept advancing during capture.
+Normal track loading retains its stopped-to-Absolute handoff, and Minimal
+browsing does not capture transport. A fresh needle drop can restore Absolute.
+
 The browser header includes 56-pixel-high Back and Close buttons. They use the
 same actions as header swipes: Back returns one level and closes at Music;
 Close returns to playback. The buttons move with the browser between fixed
