@@ -41,6 +41,18 @@ DVS, MIDI mappings or device firmware. The companion's dedicated native tests
 and full-app generated-audio smoke cover frame layout, control routing, Browse,
 GL pixels and the worker path; Pi hardware acceptance is a separate trial.
 
+With `QUIETVINYL_DENON_PLAYERS` set to a JSON list of one or two registered
+serials, Linux exposes stable logical SC6000 MIDI controllers even when their
+physical ports are absent at launch. The ALSA backend resolves each incoming
+port through its main-player sibling serial and reconnects after unplug/power
+cycles without resetting PortMidi or touching other controllers. Duplicate
+identities are withheld. Queued input is dropped before replacing a subscription.
+The existing saved controller name, mapping and per-device deck setting remain
+authoritative. Only the current mapping's short MIDI input is supported; the
+Denon backend sends no MIDI output or transport/audio configuration changes.
+The companion startup supervisor supplies the opt-in serial list and owns screen
+worker lifetimes. Without it, ordinary PortMidi discovery is retained.
+
 ## Maintenance
 
 ### Live per-deck pitch selection

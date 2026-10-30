@@ -16,6 +16,10 @@
 
 #ifdef __PORTMIDI__
 #include "controllers/midi/portmidienumerator.h"
+#ifdef __LINUX__
+#include "controllers/midi/denonmidienumerator.h"
+#include "controllers/midi/denonmidihotplug.h"
+#endif
 #endif
 
 #ifdef __HSS1394__
@@ -155,6 +159,10 @@ void ControllerManager::slotInitialize() {
     // construct since they interact with host MIDI APIs.
 #ifdef __PORTMIDI__
     m_enumerators.append(new PortMidiEnumerator());
+#ifdef __LINUX__
+    const auto denonSerials = quietvinyl::denonHotplugSerials();
+    if (!denonSerials.isEmpty()) m_enumerators.append(new DenonMidiEnumerator(denonSerials));
+#endif
 #endif
 #ifdef __HSS1394__
     m_enumerators.append(new Hss1394Enumerator(m_pConfig));

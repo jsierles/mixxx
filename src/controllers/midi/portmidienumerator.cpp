@@ -7,6 +7,7 @@
 #ifdef __LINUX__
 #include <alsa/asoundlib.h>
 #include "controllers/midi/denonusbidentity.h"
+#include "controllers/midi/denonmidihotplug.h"
 #endif
 
 #include "controllers/midi/portmidicontroller.h"
@@ -18,6 +19,13 @@ namespace {
 const auto kMidiThroughPortPrefix = QLatin1String("MIDI Through Port");
 
 bool recognizeDevice(const PmDeviceInfo& deviceInfo) {
+#ifdef __LINUX__
+    // The opt-in serial controllers retain their ALSA input across hotplug.
+    // Never open the same physical input through PortMidi as well.
+    if (!quietvinyl::denonHotplugSerials().isEmpty() &&
+            QString::fromLatin1(deviceInfo.interf) == QStringLiteral("ALSA") &&
+            QString::fromLocal8Bit(deviceInfo.name) == QStringLiteral("SC6000 Prime Controller")) return false;
+#endif
     // In developer mode we show the MIDI Through Port, otherwise ignore it
     // since it routinely causes trouble.
     return CmdlineArgs::Instance().getDeveloper() ||

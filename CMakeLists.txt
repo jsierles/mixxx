@@ -2788,6 +2788,7 @@ if(PORTMIDI)
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(ALSA REQUIRED)
     target_link_libraries(mixxx-lib PRIVATE ALSA::ALSA)
+    target_sources(mixxx-lib PRIVATE src/controllers/midi/denonmidienumerator.cpp)
   endif()
   target_sources(mixxx-lib PRIVATE
     src/controllers/midi/portmidicontroller.cpp
