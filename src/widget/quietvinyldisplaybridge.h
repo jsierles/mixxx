@@ -27,7 +27,7 @@
 // the separate display process, never to Mixxx's audio callback.
 class QuietVinylDisplayBridge : public QObject {
   public:
-    using NativeImage = std::function<QImage(QWidget*)>;
+    using NativeImage = std::function<QImage(QWidget*, qreal)>;
     static constexpr int Width = 1280;
     static constexpr int Height = 800;
 
@@ -101,16 +101,17 @@ class QuietVinylDisplayBridge : public QObject {
 
     // Paint in widget stacking order, replacing native GL containers with an
     // explicit framebuffer image. This keeps normal sibling overlays on top.
-    static QImage captureTree(QWidget* root, const NativeImage& nativeImage = {}) {
+    static QImage captureTree(QWidget* root, const NativeImage& nativeImage = {}, qreal pixelRatio = 1) {
         if (!root || root->size().isEmpty()) return {};
-        QImage image(root->size(), QImage::Format_RGB32);
+        QImage image(root->size() * pixelRatio, QImage::Format_RGB32);
+        image.setDevicePixelRatio(pixelRatio);
         image.fill(Qt::black);
         QPainter painter(&image);
         std::function<void(QWidget*, QPoint)> paint = [&](QWidget* widget, QPoint offset) {
             if (widget != root && (!widget->isVisibleTo(root) || widget->isWindow())) return;
             painter.save();
             painter.setClipRect(QRect(offset, widget->size()), Qt::IntersectClip);
-            const QImage native = nativeImage ? nativeImage(widget) : QImage();
+            const QImage native = nativeImage ? nativeImage(widget, pixelRatio) : QImage();
             if (!native.isNull()) {
                 painter.drawImage(QRect(offset, widget->size()), native);
             } else {
@@ -211,7 +212,10 @@ class QuietVinylDisplayBridge : public QObject {
                 cancel(client); reply(client, failure("display-unavailable")); return;
             }
             if (client.pressed && !validView(client)) cancel(client);
-            const auto native = captureTree(root, m_nativeImage);
+            // Rasterize directly at player density instead of enlarging an
+            // already-rasterized HDMI screenshot.
+            const qreal pixelRatio = qMin(qreal(Width) / root->width(), qreal(Height) / root->height());
+            const auto native = captureTree(root, m_nativeImage, pixelRatio);
             if (native.isNull()) { reply(client, failure("capture-failed")); return; }
             const QSize size = native.size().scaled(Width, Height, Qt::KeepAspectRatio);
             client.sourceSize = root->size();

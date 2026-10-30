@@ -1,6 +1,7 @@
 #include "mixxxmainwindow.h"
 #include "widget/quietvinyldeckscreens.h"
 #include "widget/wglwidget.h"
+#include "widget/quietvinylwaveformcapture.h"
 #include <QOpenGLWindow>
 #include "widget/quietvinylrecovery.h"
 #include "widget/wsimplelibrary.h"
@@ -1431,9 +1432,9 @@ bool MixxxMainWindow::loadConfiguredSkin() {
                     [](const QString& group, const QString& item) {
                         const ConfigKey key(group, item);
                         return ControlObject::exists(key) ? ControlObject::get(key) : 0.0;
-                    }, this, [](QWidget* widget) {
+                    }, this, [](QWidget* widget, qreal pixelRatio) {
                         if (auto* gl = dynamic_cast<WGLWidget*>(widget)) {
-                            if (auto* window = gl->getOpenGLWindow()) return window->grabFramebuffer();
+                            return quietVinylCaptureWaveform(gl, pixelRatio);
                         }
                         return QImage();
                     });

@@ -22,8 +22,11 @@ With the existing dual-screen presentation active, `QUIETVINYL_DENON_SOCKET`
 opts into an owner-only local frame/touch socket. Without that environment
 variable no display listener starts. Each client binds one deck, receives the
 existing native UI as letterboxed 1280×800 RGB, and sends ordered gestures
-through its original widgets. Native GL framebuffers are composed in stacking
-order with the ordinary controls. Stale view/geometry/sequence, duplicate deck
+through its original widgets. Text/vector controls render directly at player
+pixel density. Modern allshader waveforms use a separate framebuffer at that
+density, restoring the HDMI renderer and GL target afterwards; older GL types
+retain their existing framebuffer capture. Layers keep their stacking order.
+Stale view/geometry/sequence, duplicate deck
 owners and modal/popup activity are refused; disconnects cancel held gestures.
 
 The companion project's `denon/` worker owns USB, zlib compression, changed
