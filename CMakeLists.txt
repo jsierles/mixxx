@@ -3945,14 +3945,31 @@ if(VINYLCONTROL)
   target_compile_definitions(mixxx-lib PUBLIC __VINYLCONTROL__)
 
   # Internal xwax library
+  option(QUIETVINYL_UPSTREAM_PITCH "Use the experimental upstream per-sample pitch detector" OFF)
+  configure_file(src/vinylcontrol/quietvinylpitchconfig.h.in src/quietvinylpitchconfig.h)
+  if(QUIETVINYL_UPSTREAM_PITCH)
+    set(QUIETVINYL_XWAX_DIR lib/xwax/upstream)
+  else()
+    set(QUIETVINYL_XWAX_DIR lib/xwax)
+  endif()
   add_library(mixxx-xwax STATIC EXCLUDE_FROM_ALL)
   target_sources(
     mixxx-xwax
     PRIVATE
-      lib/xwax/timecoder.c
-      lib/xwax/lut.c
-      lib/xwax/pitch_kalman.c
+      ${QUIETVINYL_XWAX_DIR}/timecoder.c
+      ${QUIETVINYL_XWAX_DIR}/lut.c
+      ${QUIETVINYL_XWAX_DIR}/pitch_kalman.c
   )
+  if(QUIETVINYL_UPSTREAM_PITCH)
+    target_include_directories(mixxx-xwax BEFORE PRIVATE ${QUIETVINYL_XWAX_DIR})
+    target_sources(mixxx-xwax PRIVATE
+      ${QUIETVINYL_XWAX_DIR}/timecoder_mk2.c
+      ${QUIETVINYL_XWAX_DIR}/lut_mk2.c
+      ${QUIETVINYL_XWAX_DIR}/filters.c
+      ${QUIETVINYL_XWAX_DIR}/ringbuffer.c
+      ${QUIETVINYL_XWAX_DIR}/fmatrix.c
+    )
+  endif()
   target_include_directories(mixxx-xwax SYSTEM PUBLIC lib/xwax)
   target_link_libraries(mixxx-lib PRIVATE mixxx-xwax)
 endif()

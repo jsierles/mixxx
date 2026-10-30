@@ -43,6 +43,20 @@ GL pixels and the worker path; Pi hardware acceptance is a separate trial.
 
 ## Maintenance
 
+The experimental `QUIETVINYL_UPSTREAM_PITCH=ON` CMake option builds the
+per-sample pitch detector imported from upstream main commit
+`bc49961fd3e5a46cd46588090c652a0d7ec44e18`. It defaults to **OFF**, retaining
+the original 2.5.6 decoder for ordinary builds. The unchanged upstream C/header
+files and matrix/filter tests live under `lib/xwax/upstream`; `UPSTREAM.json`
+records their original paths, hashes and downloaded snapshot hash. The small
+lookup-API adapter preserves the existing formats and QuietVinyl DVS controls.
+
+This is a comparison build, not accepted live audio behavior. Initial known-motion
+tests show faster large-pitch response but overshoot of a small nudge and slower
+fine-pitch settling. The companion repository records measurements and explicit
+candidate build instructions. Keep its normal source pin independent of this
+experimental build until the response and hardware checks are satisfactory.
+
 Make source changes here as normal Git commits. The companion build pins a full
 commit hash, rather than following this branch's moving tip. Commit and push
 completed changes directly to this fork's default branch unless the owner asks

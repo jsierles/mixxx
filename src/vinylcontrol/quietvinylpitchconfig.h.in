@@ -1,0 +1,3 @@
+#pragma once
+
+#cmakedefine01 QUIETVINYL_UPSTREAM_PITCH

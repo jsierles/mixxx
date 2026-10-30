@@ -1,0 +1,96 @@
+{
+  "repository": "https://github.com/mixxxdj/mixxx",
+  "commit": "bc49961fd3e5a46cd46588090c652a0d7ec44e18",
+  "snapshot_sha256": "d70111376ff9403caa32db80eef35b50cfc4b1ed2f59a7512bcfe27796e4f320",
+  "origin_pull_request": "https://github.com/mixxxdj/mixxx/pull/15944",
+  "files": {
+    "complex.h": {
+      "upstream_path": "lib/xwax/complex.h",
+      "sha256": "8b1ee6cc08168705d8ae580aabe82e317ccdf24d577f6ce4cb09d675f31c615a"
+    },
+    "debug.h": {
+      "upstream_path": "lib/xwax/debug.h",
+      "sha256": "efafa243baf41ecff2da53d1f5c14519d3ad8135f655ef66a418ce786d123604"
+    },
+    "filters.c": {
+      "upstream_path": "lib/xwax/filters.c",
+      "sha256": "04041b954a24ca5fb7358da7e32a4eabd5cb592a91c3caa45527f2ff2766b907"
+    },
+    "filters.h": {
+      "upstream_path": "lib/xwax/filters.h",
+      "sha256": "2b8de293dc57cb276ac344ebe9aa2e66940e57702168830e2a286dee45ecf81c"
+    },
+    "fmatrix.c": {
+      "upstream_path": "lib/xwax/fmatrix.c",
+      "sha256": "5a92fb16ffc62b028551f20804664c44444ab645129ac127dfd3b2ae5106313f"
+    },
+    "fmatrix.h": {
+      "upstream_path": "lib/xwax/fmatrix.h",
+      "sha256": "2cee88ff8a2b2419037a5d4c25bad92e6bf5f53316da9352f9923d0f5dc1d414"
+    },
+    "lut.c": {
+      "upstream_path": "lib/xwax/lut.c",
+      "sha256": "5620f583300077b40901fbc297b04f6afe9cb6e53a0153999294ca73f763f56d"
+    },
+    "lut.h": {
+      "upstream_path": "lib/xwax/lut.h",
+      "sha256": "a1d62abb77dbb1dc8e5337898e5a8b82f183482c36412a56eed42f954b51ae8c"
+    },
+    "lut_mk2.c": {
+      "upstream_path": "lib/xwax/lut_mk2.c",
+      "sha256": "309840aa2538315747c509eba8bfa85706704b35b8474814e154ec9d4a51eb7a"
+    },
+    "lut_mk2.h": {
+      "upstream_path": "lib/xwax/lut_mk2.h",
+      "sha256": "cc0ce743c0d47dcb1f1dd3559e190dd46662480269d95413bd008a6028e4173e"
+    },
+    "pitch.h": {
+      "upstream_path": "lib/xwax/pitch.h",
+      "sha256": "3e9dd8bfcbc288eaea6fd8e69f31d931789b5c766cc7b338f8aae14f71d576a2"
+    },
+    "pitch_kalman.c": {
+      "upstream_path": "lib/xwax/pitch_kalman.c",
+      "sha256": "17f4745ec1ed88c8c3b58b9cd6960919cb56fa968ec5411b3bd119b0ed735663"
+    },
+    "pitch_kalman.h": {
+      "upstream_path": "lib/xwax/pitch_kalman.h",
+      "sha256": "a1efbd3aa85f22fdd693bab93a50db3ce78beb2e3d2bcd975ef6551b48dea1a3"
+    },
+    "ringbuffer.c": {
+      "upstream_path": "lib/xwax/ringbuffer.c",
+      "sha256": "4db3e1ca74613a3b20be745402d63d44bc119bf4282a6db02adecc2ba7db0aba"
+    },
+    "ringbuffer.h": {
+      "upstream_path": "lib/xwax/ringbuffer.h",
+      "sha256": "aef039134d533b9db6c831f623145ec1d3e8bc3eed552c91daa1f9bf81c89940"
+    },
+    "timecoder.c": {
+      "upstream_path": "lib/xwax/timecoder.c",
+      "sha256": "cb009d1139a65ed3336676f0f558809a75e33dce810eb32b334e8693288ecb65"
+    },
+    "timecoder.h": {
+      "upstream_path": "lib/xwax/timecoder.h",
+      "sha256": "d1f82e107af71f2300a95f3bb4cc42bb9c9b0ec89c6f353fb7f4801ed35587fd"
+    },
+    "timecoder_mk2.c": {
+      "upstream_path": "lib/xwax/timecoder_mk2.c",
+      "sha256": "bcf1bb01057415835c284c4330eddb8a8920c0ceedc2393e0e85e7c9feccbb78"
+    },
+    "timecoder_mk2.h": {
+      "upstream_path": "lib/xwax/timecoder_mk2.h",
+      "sha256": "498fa1027ba437936f6cb9b2f96a208d329d725b9538831d7addb4df591e75b6"
+    },
+    "types.h": {
+      "upstream_path": "lib/xwax/types.h",
+      "sha256": "78ef913ed22b916f54c15eed3e06dc0f6a32496262d3b7d5893d754628584d45"
+    },
+    "tests/matrixapitest.cpp": {
+      "upstream_path": "src/test/matrixapitest.cpp",
+      "sha256": "0e02f5f50129f3a2b90196ab1a45a34711a864d3662e409aaa151e0a88c3f696"
+    },
+    "tests/savitzkygolaytest.cpp": {
+      "upstream_path": "src/test/savitzkygolaytest.cpp",
+      "sha256": "0f93bc544f4f8e4d249dc2308ece6d0628b99a9afdf6ef399daeb0146e7e6a85"
+    }
+  }
+}

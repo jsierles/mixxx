@@ -7,12 +7,21 @@
 #include "vinylcontrol/vinylcontrol.h"
 #include "vinylcontrol/needledropdetector.h"
 #include "vinylcontrol/vinylbrowsesignalloss.h"
+#include "quietvinylpitchconfig.h"
 
 #ifdef _MSC_VER
+#if QUIETVINYL_UPSTREAM_PITCH
+#include "upstream/timecoder.h"
+#else
 #include "timecoder.h"
+#endif
 #else
 extern "C" {
+#if QUIETVINYL_UPSTREAM_PITCH
+#include "upstream/timecoder.h"
+#else
 #include "timecoder.h"
+#endif
 }
 #endif
 

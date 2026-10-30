@@ -25,6 +25,16 @@
 
 namespace {
 constexpr int kChannels = 2;
+
+timecode_def* findTimecodeDefinition(const char* name) {
+#if QUIETVINYL_UPSTREAM_PITCH
+    // Existing formats need no disk-backed MK2 lookup table. The experimental
+    // detector does not add new formats to QuietVinyl's preferences.
+    return timecoder_find_definition(name, nullptr);
+#else
+    return timecoder_find_definition(name);
+#endif
+}
 } // namespace
 
 // Sample threshold below which we consider there to be no signal.
@@ -122,12 +132,12 @@ VinylControlXwax::VinylControlXwax(UserSettingsPointer pConfig, const QString& g
         m_pSteadyGross = new SteadyPitch(0.5, false);
     }
 
-    timecode_def* tc_def = timecoder_find_definition(timecode);
+    timecode_def* tc_def = findTimecodeDefinition(timecode);
     if (tc_def == nullptr) {
         qDebug() << "Error finding timecode definition for " << timecode
                  << ", defaulting to" << MIXXX_VINYL_DEFAULT_XWAX_NAME;
         timecode = MIXXX_VINYL_DEFAULT_XWAX_NAME;
-        tc_def = timecoder_find_definition(timecode);
+        tc_def = findTimecodeDefinition(timecode);
     }
 
     double speed = 1.0;
