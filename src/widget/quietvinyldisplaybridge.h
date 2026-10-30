@@ -205,7 +205,7 @@ class QuietVinylDisplayBridge : public QObject {
         auto* root = m_roots[client.deck].data();
         if (op == "cancel") { cancel(client); reply(client, {{"ok", true}}); return; }
         if (op == "frame") {
-            if (client.frameClock.isValid() && client.frameClock.elapsed() < 33) {
+            if (client.frameClock.isValid() && client.frameClock.elapsed() < 16) {
                 reply(client, failure("frame-rate")); return;
             }
             if (!root->isVisible() || QApplication::activeModalWidget() || QApplication::activePopupWidget()) {
