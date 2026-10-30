@@ -47,7 +47,12 @@ class QuietVinylRecoveryBridge : public QObject {
                             }
                             decks.append(state);
                         }
-                        reply = {{"ok", true}, {"decks", decks}};
+                        QJsonObject audio;
+                        for (const char* key : {"audio_latency_usage", "audio_latency_overload_count",
+                                     "audio_latency_overload"}) {
+                            audio.insert(key, m_read("[App]", key));
+                        }
+                        reply = {{"ok", true}, {"decks", decks}, {"audio", audio}};
                     } else if (op == "quit" && !m_quitting) {
                         m_quitting = true;
                         reply = {{"ok", true}};
