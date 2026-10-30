@@ -28,6 +28,8 @@ density, restoring the HDMI renderer and GL target afterwards; older GL types
 retain their existing framebuffer capture. Layers keep their stacking order.
 Stale view/geometry/sequence, duplicate deck
 owners and modal/popup activity are refused; disconnects cancel held gestures.
+Frame admission is capped at about 30 requests/second per deck and counts
+capture work toward that interval, allowing a fixed-cadence sidecar.
 
 The companion project's `denon/` worker owns USB, zlib compression, changed
 rectangles, serial assignments and reconnects outside the audio engine. This

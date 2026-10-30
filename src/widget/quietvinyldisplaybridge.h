@@ -205,12 +205,13 @@ class QuietVinylDisplayBridge : public QObject {
         auto* root = m_roots[client.deck].data();
         if (op == "cancel") { cancel(client); reply(client, {{"ok", true}}); return; }
         if (op == "frame") {
-            if (client.frameClock.isValid() && client.frameClock.elapsed() < 100) {
+            if (client.frameClock.isValid() && client.frameClock.elapsed() < 33) {
                 reply(client, failure("frame-rate")); return;
             }
             if (!root->isVisible() || QApplication::activeModalWidget() || QApplication::activePopupWidget()) {
                 cancel(client); reply(client, failure("display-unavailable")); return;
             }
+            client.frameClock.start();
             if (client.pressed && !validView(client)) cancel(client);
             // Rasterize directly at player density instead of enlarging an
             // already-rasterized HDMI screenshot.
@@ -226,7 +227,6 @@ class QuietVinylDisplayBridge : public QObject {
             QPainter painter(&canvas);
             painter.drawImage(client.imageRect, native);
             painter.end();
-            client.frameClock.start();
             const QByteArray pixels(reinterpret_cast<const char*>(canvas.constBits()), canvas.sizeInBytes());
             reply(client, {{"ok", true}, {"width", Width}, {"height", Height},
                     {"epoch", client.epoch}, {"format", "RGB"}}, pixels);
