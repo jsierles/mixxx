@@ -59,7 +59,7 @@ class QuietVinylDeckScreens : public QWidget {
         const auto displaySocket = qEnvironmentVariable("QUIETVINYL_DENON_SOCKET");
         if (!displaySocket.isEmpty()) {
             new QuietVinylDisplayBridge(displaySocket, {m_hosts[0], m_hosts[1]},
-                    std::move(nativeImage), this);
+                    std::move(nativeImage), this, [this] { refresh(); });
         }
     }
 

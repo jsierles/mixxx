@@ -32,8 +32,10 @@ class QuietVinylDisplayBridge : public QObject {
     static constexpr int Height = 800;
 
     QuietVinylDisplayBridge(const QString& path, const std::array<QWidget*, 2>& roots,
-            NativeImage nativeImage = {}, QObject* parent = nullptr)
-            : QObject(parent), m_nativeImage(std::move(nativeImage)) {
+            NativeImage nativeImage = {}, QObject* parent = nullptr,
+            std::function<void()> synchronize = {})
+            : QObject(parent), m_nativeImage(std::move(nativeImage)),
+              m_synchronize(std::move(synchronize)) {
         for (int i = 0; i < 2; ++i) m_roots[i] = roots[i];
         if (!QDir::isAbsolutePath(path)) return;
         m_lock = std::make_unique<QLockFile>(path + ".lock");
@@ -142,6 +144,7 @@ class QuietVinylDisplayBridge : public QObject {
     QLocalServer m_server;
     QTimer m_watchdog;
     NativeImage m_nativeImage;
+    std::function<void()> m_synchronize;
     std::unique_ptr<QLockFile> m_lock;
 
     static QJsonObject failure(const char* reason) {
@@ -195,6 +198,9 @@ class QuietVinylDisplayBridge : public QObject {
             return;
         }
         if (client.deck < 0 || !m_roots[client.deck]) { reply(client, failure("not-bound")); return; }
+        // Apply external MIDI/view changes now, rather than waiting for the
+        // presentation's next 20 ms timer tick before validating a touch.
+        if (m_synchronize) m_synchronize();
         auto* root = m_roots[client.deck].data();
         if (op == "cancel") { cancel(client); reply(client, {{"ok", true}}); return; }
         if (op == "frame") {
