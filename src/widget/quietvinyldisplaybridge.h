@@ -162,7 +162,9 @@ class QuietVinylDisplayBridge : public QObject {
     }
     QString epoch(const Client& client) const {
         auto* root = client.deck >= 0 ? m_roots[client.deck].data() : nullptr;
-        return root ? root->property("quietvinylDisplayEpoch").toString() : QString();
+        const auto view = root ? root->property("quietvinylDisplayEpoch").toString() : QString();
+        return view.isEmpty() ? QString() : QStringLiteral("%1:%2x%3")
+                .arg(view).arg(root->width()).arg(root->height());
     }
     bool validView(const Client& client) const {
         auto* root = client.deck >= 0 ? m_roots[client.deck].data() : nullptr;

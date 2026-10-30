@@ -28,6 +28,8 @@ density, restoring the HDMI renderer and GL target afterwards; older GL types
 retain their existing framebuffer capture. Layers keep their stacking order.
 Stale view/geometry/sequence, duplicate deck
 owners and modal/popup activity are refused; disconnects cancel held gestures.
+The opaque frame epoch includes logical deck geometry, so a prefetched resize
+cannot authorize input against the previously displayed image.
 Frame admission is capped at about 60 requests/second per deck and counts
 capture work toward that interval, allowing a fixed-cadence sidecar.
 
